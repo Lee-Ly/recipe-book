@@ -49,7 +49,7 @@ export default function LoginForm({ next }: { next: string }) {
           {error}
         </p>
       )}
-      <button type="submit" disabled={busy || !password} className={btnPrimary}>
+      <button type="submit" disabled={busy || !password} className={`${btnPrimary} w-full py-3 text-sm`}>
         {busy ? "Checking…" : "Log in"}
       </button>
     </form>

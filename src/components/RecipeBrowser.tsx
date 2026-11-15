@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
 import { categoryFilterLabel, categoryLabel } from "@/lib/categories";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
-import { btnGhost, btnPrimary, cardCls, categoryBadge, filterChip, inputCls, panelCls, tagBadge } from "./ui";
+import { ArrowLeftIcon, ArrowRightIcon, HeartIcon, SearchIcon } from "./icons";
+import { btnDark, btnGhost, btnPrimary, cardCls, categoryBadge, filterChip, searchCls, tagBadge } from "./ui";
 
 export interface CardData {
   id: string;
@@ -43,12 +44,8 @@ function readLastViewed(): string | null {
   }
 }
 
-function Heart({ on }: { on: boolean }) {
-  return (
-    <svg viewBox="0 0 24 24" className={`h-[18px] w-[18px] ${on ? "fill-accent text-accent" : "fill-none text-foreground/70"}`} stroke="currentColor" strokeWidth="2" aria-hidden>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-    </svg>
-  );
+function countLabel(n: number): string {
+  return n === 1 ? "מתכון אחד" : `${n} מתכונים`;
 }
 
 export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes: CardData[]; initialQuery?: string }) {
@@ -75,6 +72,7 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
   const start = current === 1 ? 0 : FIRST_PAGE + (current - 2) * NEXT_PAGES;
   const shown = visible.slice(start, current === 1 ? FIRST_PAGE : start + NEXT_PAGES);
   const resume = !query && !filter ? recipes.find((r) => r.id === lastId) : undefined;
+  const heading = filter === FAVORITES ? "מועדפים" : filter ? categoryFilterLabel(filter) : "כל המתכונים";
 
   function changeQuery(v: string) {
     setQuery(v);
@@ -103,18 +101,13 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
   }
 
   return (
-    <div className="flex flex-col gap-4">
-      <input
-        type="search"
-        dir="rtl"
-        value={query}
-        onChange={(e) => changeQuery(e.target.value)}
-        placeholder="חפש מתכון"
-        aria-label="חפש מתכון"
-        className={inputCls}
-      />
+    <div className="space-y-5 pt-4">
+      <div className="relative">
+        <SearchIcon className="pointer-events-none absolute start-3.5 top-3.5 h-4 w-4 text-muted-2" />
+        <input type="search" dir="rtl" value={query} onChange={(e) => changeQuery(e.target.value)} placeholder="חפש מתכון" aria-label="חפש מתכון" className={searchCls} />
+      </div>
 
-      <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="Categories">
+      <div className="no-scrollbar -mx-5 flex items-center gap-2 overflow-x-auto px-5 pb-0.5" role="group" aria-label="Categories">
         <button type="button" onClick={() => changeFilter(null)} aria-pressed={filter === null} className={filterChip(filter === null)}>
           הכל
         </button>
@@ -131,27 +124,36 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
       </div>
 
       {resume && (
-        <Link href={`/recipes/${resume.id}`} className={`flex items-center gap-3 ${panelCls} p-2.5 pe-4 active:opacity-80`}>
-          <div className="h-14 w-14 shrink-0 overflow-hidden rounded-xl bg-line">
-            {resume.image ? <img src={`/api/img/${resume.image}`} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xl opacity-60">🍽️</div>}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="text-xs font-semibold text-accent">המשך מתכון</p>
-            <p dir="auto" className="truncate text-[15px] font-bold">
-              {resume.title}
-            </p>
-          </div>
-          <span className="rounded-xl bg-accent px-4 py-2 text-sm font-bold text-accent-fg">המשך</span>
-        </Link>
+        <div className="flex items-center justify-between gap-3 rounded-2xl bg-foreground p-3.5 text-background shadow-md">
+          <Link href={`/recipes/${resume.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-white/15 bg-white/10">
+              {resume.image ? <img src={`/api/img/${resume.image}`} alt="" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-lg opacity-60">🍽️</div>}
+            </div>
+            <div className="min-w-0">
+              <span className="block text-[10px] font-bold uppercase tracking-wider text-accent">המשך מתכון</span>
+              <h3 dir="auto" className="truncate text-sm font-bold">
+                {resume.title}
+              </h3>
+            </div>
+          </Link>
+          <Link href={`/recipes/${resume.id}`} className={btnPrimary}>
+            המשך
+          </Link>
+        </div>
       )}
 
+      <div className="flex items-center justify-between pt-1">
+        <h2 className="text-base font-bold">{heading}</h2>
+        <span className="text-xs font-medium tabular-nums text-muted">{countLabel(visible.length)}</span>
+      </div>
+
       {visible.length === 0 ? (
-        <div className="py-16 text-center text-muted">
-          <p>אין תוצאות</p>
+        <div className="rounded-2xl border border-line bg-accent-soft p-8 text-center">
+          <p className="text-sm font-bold">אין תוצאות</p>
           {(query || filter) && (
             <button
               type="button"
-              className="mt-1 min-h-11 text-accent underline"
+              className={`${btnDark} mt-3`}
               onClick={() => {
                 changeQuery("");
                 changeFilter(null);
@@ -163,11 +165,11 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
         </div>
       ) : (
         <>
-          <ul className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 sm:gap-x-4 lg:grid-cols-4">
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-3.5 lg:grid-cols-4">
             {shown.map((r) => (
-              <li key={r.id} className={`relative ${cardCls} p-2`}>
-                <Link href={`/recipes/${r.id}`} className="group block">
-                  <div className="aspect-[4/3] overflow-hidden rounded-xl bg-accent-soft">
+              <li key={r.id} className="relative">
+                <Link href={`/recipes/${r.id}`} className={`group block p-3 ${cardCls}`}>
+                  <div className="aspect-[4/3] overflow-hidden rounded-xl border border-line/50 bg-accent-soft">
                     {r.image ? (
                       <img src={`/api/img/${r.image}`} alt="" loading="lazy" className="h-full w-full object-cover" />
                     ) : (
@@ -176,15 +178,15 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
                       </div>
                     )}
                   </div>
-                  <h2 dir="auto" className="mt-2.5 line-clamp-2 px-1 text-[15px] font-bold leading-snug">
+                  <h3 dir="auto" className="mt-2.5 line-clamp-2 text-sm font-bold leading-snug transition group-hover:text-accent group-active:text-accent">
                     {r.title}
-                  </h2>
+                  </h3>
                   {r.author && (
-                    <p dir={r.language === "he" ? "rtl" : "ltr"} className="mt-0.5 truncate px-1 text-xs font-light text-muted">
+                    <p dir={r.language === "he" ? "rtl" : "ltr"} className="mt-0.5 truncate text-xs font-light text-muted">
                       <bdi>{r.author}</bdi>
                     </p>
                   )}
-                  <p dir={r.language === "he" ? "rtl" : "ltr"} className="mt-2 flex max-h-14 flex-wrap gap-1 overflow-hidden px-1 pb-1">
+                  <p dir={r.language === "he" ? "rtl" : "ltr"} className="mt-2 flex flex-wrap gap-1">
                     {r.categories[0] && <span className={categoryBadge}>{categoryLabel(r.categories[0], r.language)}</span>}
                     {r.tags.slice(0, 3).map((t) => (
                       <span key={t} className={tagBadge}>
@@ -198,24 +200,28 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
                   onClick={() => toggleFavorite(r.id)}
                   aria-pressed={!!favs[r.id]}
                   aria-label={favs[r.id] ? `Remove ${r.title} from favorites` : `Add ${r.title} to favorites`}
-                  className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-background/90 backdrop-blur active:scale-95"
+                  className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-xl border border-line bg-card/90 backdrop-blur transition hover:border-accent active:border-accent"
                 >
-                  <Heart on={!!favs[r.id]} />
+                  <HeartIcon filled={!!favs[r.id]} className={`h-4 w-4 transition ${favs[r.id] ? "text-accent" : "text-muted-2"}`} />
                 </button>
               </li>
             ))}
           </ul>
 
           {totalPages > 1 && (
-            <nav aria-label="Pages" className="flex items-center justify-between gap-3 pt-2">
+            <nav aria-label="Pages" className="flex items-center justify-between gap-3 pb-4 pt-2">
               <button type="button" disabled={current <= 1} onClick={() => goTo(current - 1)} className={btnGhost}>
-                <span aria-hidden className="inline-block rtl:rotate-180">←</span> Prev
+                <ArrowRightIcon className="h-3.5 w-3.5 ltr:hidden" />
+                <ArrowLeftIcon className="h-3.5 w-3.5 rtl:hidden" />
+                <span>Prev Page</span>
               </button>
-              <span className="text-sm text-muted tabular-nums">
+              <span className="text-xs font-semibold tabular-nums text-muted">
                 Page {current} of {totalPages}
               </span>
-              <button type="button" disabled={current >= totalPages} onClick={() => goTo(current + 1)} className={`${btnPrimary} min-h-11 text-sm`}>
-                Next <span aria-hidden className="inline-block rtl:rotate-180">→</span>
+              <button type="button" disabled={current >= totalPages} onClick={() => goTo(current + 1)} className={`${btnDark} px-4 py-2.5`}>
+                <span>Next Page</span>
+                <ArrowLeftIcon className="h-3.5 w-3.5 ltr:hidden" />
+                <ArrowRightIcon className="h-3.5 w-3.5 rtl:hidden" />
               </button>
             </nav>
           )}

@@ -34,10 +34,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="he" dir="rtl" className={`${dmSans.variable} ${openSans.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-8">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-8">{children}</main>
         {authed && (
           <footer className="border-t border-line">
-            <div className="mx-auto flex max-w-5xl justify-center px-4 py-3">
+            <div className="mx-auto flex max-w-5xl justify-center px-5 py-3">
               <LogoutButton />
             </div>
           </footer>

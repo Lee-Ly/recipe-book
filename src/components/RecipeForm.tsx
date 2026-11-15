@@ -6,8 +6,9 @@ import { useMemo, useState } from "react";
 import { categoryLabel, DEFAULT_CATEGORIES } from "@/lib/categories";
 import { PAN_SHAPES } from "@/lib/pan";
 import type { Ingredient, Pan, RecipeDraft } from "@/lib/types";
+import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon } from "./icons";
 import TagEditor from "./TagEditor";
-import { btnGhost, btnPrimary, btnText, filterChip, inputCls } from "./ui";
+import { btnDark, btnDashed, btnGhost, btnText, categoryToggle, fieldLabel, inputCls, panelCls, rowCls } from "./ui";
 
 export interface FormInitial extends RecipeDraft {
   sourceUrl: string;
@@ -44,14 +45,29 @@ const toNumber = (s: string): number | null => {
 
 const emptyRow: IngredientRow = { name: "", original: "", cups: "", grams: "", ml: "", converted: false };
 
-const sectionTitle = "mb-2 block text-sm font-semibold";
+/** "350g potato gnocchi" or "2 כוסות קמח" -> a row with the number in the right unit; other lines become a plain name. */
+function parseBulkLine(line: string): IngredientRow {
+  const m = /^(\d+(?:[.,]\d+)?)\s*(g|gr|גרם|גר|ml|מ״ל|מ"ל|cups?|כוסות|כוס)?\s+(.+)$/i.exec(line);
+  if (!m) return { ...emptyRow, name: line };
+  const n = m[1].replace(",", ".");
+  const unit = (m[2] ?? "").toLowerCase();
+  const row = { ...emptyRow, name: m[3], original: `${m[1]}${m[2] ? ` ${m[2]}` : ""}` };
+  if (/^(g|gr|גרם|גר)$/.test(unit)) row.grams = n;
+  else if (/^(ml|מ״ל|מ"ל)$/.test(unit)) row.ml = n;
+  else if (/^(cup|cups|כוס|כוסות)$/.test(unit)) row.cups = n;
+  else return { ...emptyRow, name: line };
+  return row;
+}
 
-export default function RecipeForm({ initial, mode }: { initial: FormInitial; mode: Mode }) {
+const smallField = "w-full rounded-lg bg-accent-soft px-2 py-1.5 text-center text-base font-bold tabular-nums text-foreground outline-none focus:bg-card";
+const stepBtn = "flex h-7 w-7 items-center justify-center rounded-lg border border-line text-chip-text transition hover:border-foreground active:border-foreground disabled:opacity-30";
+
+export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { initial: FormInitial; mode: Mode; formId?: string }) {
   const router = useRouter();
   const editing = mode.kind === "edit";
   const [title, setTitle] = useState(initial.title);
   const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl);
-  const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients.map(toRow));
+  const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients.length ? initial.ingredients.map(toRow) : [{ ...emptyRow }]);
   const [steps, setSteps] = useState<string[]>(initial.steps.length ? initial.steps : [""]);
   const [author, setAuthor] = useState(initial.author);
   const [oven, setOven] = useState(initial.ovenCelsius?.toString() ?? "");
@@ -67,13 +83,13 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
   const [customCategory, setCustomCategory] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
-  const shownImage = removeImage
-    ? null
-    : (preview ?? (initial.storedImage ? `/api/img/${initial.storedImage}` : initial.remoteImageUrl || null));
+  const shownImage = removeImage ? null : (preview ?? (initial.storedImage ? `/api/img/${initial.storedImage}` : initial.remoteImageUrl || null));
 
   const he = initial.language === "he";
   const allCategories = [...DEFAULT_CATEGORIES.map((c) => c.id), ...categories.filter((c) => !DEFAULT_CATEGORIES.some((d) => d.id === c))];
@@ -98,6 +114,14 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
     });
   }
 
+  function parseBulk() {
+    const lines = bulkText.split("\n").map((l) => l.trim()).filter(Boolean);
+    if (lines.length === 0) return;
+    setRows((cur) => [...cur.filter((r) => r.name.trim() || r.original.trim()), ...lines.map(parseBulkLine)]);
+    setBulkText("");
+    setBulkOpen(false);
+  }
+
   function toggleCategory(id: string) {
     setCategories((cur) => (cur.includes(id) ? cur.filter((c) => c !== id) : [...cur, id]));
   }
@@ -110,8 +134,10 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
+    if (busy) return;
     if (!title.trim()) {
-      setError("Please give the recipe a title.");
+      setError("Please enter a recipe title.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     setBusy(true);
@@ -126,14 +152,18 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
         ml: toNumber(r.ml),
         converted: r.converted,
       }));
+    const cleanSteps = steps.map((s) => s.trim()).filter(Boolean);
     const a = toNumber(panA);
     const pan: Pan | null = panShape && a && a > 0 ? { shape: panShape, a, b: panShape === "rect" ? (toNumber(panB) ?? a) : null } : null;
+    // A recipe typed by hand has no detected language, so it follows the letters used.
+    const typedHebrew = /[֐-׿]/.test([title, ...ingredients.map((i) => i.name), ...cleanSteps].join(" "));
+    const language = typedHebrew ? "he" : initial.title ? initial.language : "en";
     const data = {
       title: title.trim(),
-      language: initial.language,
+      language,
       author: author.trim(),
       ingredients,
-      steps: steps.map((s) => s.trim()).filter(Boolean),
+      steps: cleanSteps,
       ovenCelsius: toNumber(oven),
       totalMinutes: toNumber(minutes),
       servings: toNumber(servings),
@@ -160,71 +190,194 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
   }
 
   return (
-    <form onSubmit={save} className="flex flex-col gap-8">
-      <section>
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-accent-soft">
-          {shownImage ? (
-            <img src={shownImage} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-sm text-muted">No photo</div>
-          )}
+    <form id={formId} onSubmit={save} className="space-y-5">
+      {error && (
+        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs font-semibold text-red-700">
+          {error}
+        </p>
+      )}
+
+      {/* Essentials */}
+      <div className={`${panelCls} space-y-4 p-4`}>
+        <div>
+          <span className={fieldLabel}>Photo</span>
+          <div className="aspect-video w-full overflow-hidden rounded-xl border border-line bg-card">
+            {shownImage ? <img src={shownImage} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-xs text-muted-2">No photo</div>}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <label className={`${btnGhost} cursor-pointer py-2`}>
+              {shownImage ? "Change photo" : "Add photo"}
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                className="sr-only"
+                onChange={(e) => {
+                  setFile(e.target.files?.[0] ?? null);
+                  setRemoveImage(false);
+                }}
+              />
+            </label>
+            {shownImage && (
+              <button
+                type="button"
+                className={btnText}
+                onClick={() => {
+                  setFile(null);
+                  setRemoveImage(true);
+                }}
+              >
+                Remove
+              </button>
+            )}
+          </div>
         </div>
-        <div className="mt-2 flex gap-2">
-          <label className={`${btnGhost} cursor-pointer`}>
-            {shownImage ? "Change photo" : "Add photo"}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              className="sr-only"
-              onChange={(e) => {
-                setFile(e.target.files?.[0] ?? null);
-                setRemoveImage(false);
-              }}
-            />
+
+        <div>
+          <label htmlFor="title" className={fieldLabel}>
+            Recipe Title *
           </label>
-          {shownImage && (
-            <button
-              type="button"
-              className={`${btnText} text-muted`}
-              onClick={() => {
-                setFile(null);
-                setRemoveImage(true);
-              }}
-            >
-              Remove
-            </button>
-          )}
+          <input id="title" dir="auto" placeholder="e.g., Crispy Garlic Chili Noodles" value={title} onChange={(e) => setTitle(e.target.value)} className={inputCls} />
         </div>
-      </section>
 
-      <section>
-        <label htmlFor="title" className={sectionTitle}>
-          Title
-        </label>
-        <input id="title" dir="auto" value={title} onChange={(e) => setTitle(e.target.value)} className={`${inputCls} min-h-12 text-lg font-semibold`} />
-      </section>
+        <div>
+          <label htmlFor="author" className={fieldLabel}>
+            Author
+          </label>
+          <input id="author" dir="auto" placeholder="Instagram name or website" value={author} onChange={(e) => setAuthor(e.target.value)} className={inputCls} />
+        </div>
 
-      <section>
-        <label htmlFor="author" className={sectionTitle}>
-          Author <span className="font-normal text-muted">Instagram name or website</span>
-        </label>
-        <input id="author" dir="auto" placeholder="@name" value={author} onChange={(e) => setAuthor(e.target.value)} className={inputCls} />
-      </section>
+        <div>
+          <span className={fieldLabel}>Suggested Categories</span>
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Categories">
+            {allCategories.map((id) => {
+              const on = categories.includes(id);
+              return (
+                <button key={id} type="button" aria-pressed={on} onClick={() => toggleCategory(id)} className={categoryToggle(on)}>
+                  {on ? "✓ " : ""}
+                  {categoryLabel(id, he ? "he" : "en")}
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-2 flex items-center gap-2">
+            <input
+              dir="auto"
+              placeholder="Add your own category"
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  addCustomCategory();
+                }
+              }}
+              className={`${inputCls} min-w-0 flex-1 py-2`}
+            />
+            <button type="button" onClick={addCustomCategory} className={btnDark}>
+              + Add
+            </button>
+          </div>
+        </div>
 
-      <section>
-        <span className={sectionTitle}>Ingredients</span>
-        {rows.length === 0 && <p className="mb-2 text-sm text-muted">No ingredients yet.</p>}
-        {rows.some((r) => r.converted) && <p className="mb-3 text-sm text-muted">Amounts were converted automatically (cups, grams, ml). Worth a quick check, especially for baking.</p>}
-        <ul className="flex flex-col">
+        <div>
+          <span className={fieldLabel}>Tags</span>
+          <TagEditor
+            tags={tags}
+            suggested={suggested}
+            onChange={(t, s) => {
+              setTags(t);
+              setSuggested(s);
+            }}
+          />
+        </div>
+
+        <div>
+          <label htmlFor="source" className={fieldLabel}>
+            Source link
+          </label>
+          <input id="source" dir="ltr" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} className={inputCls} />
+        </div>
+      </div>
+
+      {/* Details */}
+      <div className={`${panelCls} space-y-3 p-4`}>
+        <h2 className="text-sm font-bold">Details</h2>
+        <div className="grid grid-cols-3 gap-2">
+          <label>
+            <span className={fieldLabel}>Oven °C</span>
+            <input type="number" inputMode="numeric" min="0" value={oven} onChange={(e) => setOven(e.target.value)} className={inputCls} />
+          </label>
+          <label>
+            <span className={fieldLabel}>Minutes</span>
+            <input type="number" inputMode="numeric" min="0" value={minutes} onChange={(e) => setMinutes(e.target.value)} className={inputCls} />
+          </label>
+          <label>
+            <span className={fieldLabel}>Serves</span>
+            <input type="number" inputMode="numeric" min="1" value={servings} onChange={(e) => setServings(e.target.value)} className={inputCls} />
+          </label>
+        </div>
+        <div>
+          <span className={fieldLabel}>Pan size (for baking)</span>
+          <div className="flex flex-wrap items-center gap-2">
+            <select aria-label="Pan shape" value={panShape} onChange={(e) => setPanShape(e.target.value as Pan["shape"] | "")} className={`${inputCls} w-auto`}>
+              <option value="">No pan</option>
+              {PAN_SHAPES.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.label}
+                </option>
+              ))}
+            </select>
+            {panShape && (
+              <>
+                <input aria-label={panShape === "round" ? "Diameter in cm" : panShape === "square" ? "Side in cm" : "Length in cm"} type="number" inputMode="decimal" min="1" step="any" placeholder={panShape === "round" ? "Diameter" : panShape === "square" ? "Side" : "Length"} value={panA} onChange={(e) => setPanA(e.target.value)} className={`${inputCls} w-28`} />
+                {panShape === "rect" && (
+                  <>
+                    <span className="text-muted">×</span>
+                    <input aria-label="Width in cm" type="number" inputMode="decimal" min="1" step="any" placeholder="Width" value={panB} onChange={(e) => setPanB(e.target.value)} className={`${inputCls} w-28`} />
+                  </>
+                )}
+                <span className="text-xs font-bold text-muted">cm</span>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Ingredients */}
+      <div className={`${panelCls} space-y-3 p-4`}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold">Ingredients</h2>
+          <button type="button" onClick={() => setBulkOpen(!bulkOpen)} className={btnText}>
+            Paste Bulk List
+          </button>
+        </div>
+
+        {rows.some((r) => r.converted) && <p className="text-[11px] text-muted">Amounts were converted automatically (cups, grams, ml). Worth a quick check, especially for baking.</p>}
+
+        {bulkOpen && (
+          <div className={`${rowCls} space-y-2 p-3`}>
+            <textarea dir="auto" rows={3} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"350g potato gnocchi\n55g unsalted butter\n2 כוסות קמח"} className="w-full rounded-lg border border-line p-2 text-base outline-none focus:border-foreground" />
+            <div className="flex items-center justify-end gap-2">
+              <button type="button" onClick={() => setBulkOpen(false)} className="px-2.5 py-1 text-xs font-semibold text-muted">
+                Close
+              </button>
+              <button type="button" onClick={parseBulk} className="rounded-lg bg-foreground px-3 py-1 text-xs font-bold text-background">
+                Parse Lines
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
           {rows.map((r, i) => (
-            <li key={i} className="border-b border-line py-3 first:pt-0">
-              <div className="flex items-center gap-2">
-                <input aria-label="Ingredient name" dir="auto" placeholder="Ingredient" value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} className={inputCls} />
-                <button type="button" aria-label="Remove ingredient" onClick={() => setRows(rows.filter((_, idx) => idx !== i))} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-muted active:bg-accent-soft">
-                  ✕
+            <div key={i} className={`${rowCls} space-y-1.5 p-2`}>
+              <div className="flex items-center gap-1.5">
+                <input aria-label="Ingredient name" dir="auto" placeholder="Ingredient name..." value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 text-base font-medium outline-none placeholder:font-normal placeholder:text-muted-2" />
+                <button type="button" aria-label="Remove ingredient" onClick={() => setRows(rows.length > 1 ? rows.filter((_, idx) => idx !== i) : [{ ...emptyRow }])} className="p-1 text-muted-2 transition hover:text-rose-600 active:text-rose-600">
+                  <TrashIcon className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <div className="mt-2 grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5">
                 {(["cups", "grams", "ml"] as const).map((f) => (
                   <div key={f} className="relative">
                     <input
@@ -236,159 +389,59 @@ export default function RecipeForm({ initial, mode }: { initial: FormInitial; mo
                       min="0"
                       value={r[f]}
                       onChange={(e) => setRow(i, { [f]: e.target.value })}
-                      className={`${inputCls} pe-12 ps-3`}
+                      className={`${smallField} pe-9`}
                     />
-                    <span aria-hidden className="pointer-events-none absolute end-3 top-1/2 -translate-y-1/2 text-xs text-muted">
+                    <span aria-hidden className="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-muted-2">
                       {f === "cups" ? "cup" : f === "grams" ? "g" : "ml"}
                     </span>
                   </div>
                 ))}
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
-        <button type="button" onClick={() => setRows([...rows, { ...emptyRow }])} className={`${btnText} mt-1`}>
-          + Add ingredient
-        </button>
-      </section>
-
-      <section className="grid grid-cols-2 gap-3">
-        <label className="text-sm font-semibold">
-          Oven °C
-          <input type="number" inputMode="numeric" min="0" value={oven} onChange={(e) => setOven(e.target.value)} className={`${inputCls} mt-2 font-normal`} />
-        </label>
-        <label className="text-sm font-semibold">
-          Total minutes
-          <input type="number" inputMode="numeric" min="0" value={minutes} onChange={(e) => setMinutes(e.target.value)} className={`${inputCls} mt-2 font-normal`} />
-        </label>
-        <label className="col-span-2 text-sm font-semibold">
-          Serves <span className="font-normal text-muted">people, used to scale cooking recipes</span>
-          <input type="number" inputMode="numeric" min="1" value={servings} onChange={(e) => setServings(e.target.value)} className={`${inputCls} mt-2 font-normal`} />
-        </label>
-      </section>
-
-      <section>
-        <span className={sectionTitle}>
-          Pan size <span className="font-normal text-muted">used to scale baking recipes</span>
-        </span>
-        <div className="flex flex-wrap items-center gap-2">
-          <select aria-label="Pan shape" value={panShape} onChange={(e) => setPanShape(e.target.value as Pan["shape"] | "")} className={`${inputCls} w-auto`}>
-            <option value="">No pan</option>
-            {PAN_SHAPES.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          {panShape && (
-            <>
-              <input aria-label={panShape === "round" ? "Diameter in cm" : panShape === "square" ? "Side in cm" : "Length in cm"} type="number" inputMode="decimal" min="1" step="any" placeholder={panShape === "round" ? "Diameter" : panShape === "square" ? "Side" : "Length"} value={panA} onChange={(e) => setPanA(e.target.value)} className={`${inputCls} w-28`} />
-              {panShape === "rect" && (
-                <>
-                  <span className="text-muted">×</span>
-                  <input aria-label="Width in cm" type="number" inputMode="decimal" min="1" step="any" placeholder="Width" value={panB} onChange={(e) => setPanB(e.target.value)} className={`${inputCls} w-28`} />
-                </>
-              )}
-              <span className="text-sm text-muted">cm</span>
-            </>
-          )}
         </div>
-      </section>
 
-      <section>
-        <span className={sectionTitle}>
-          Method <span className="font-normal text-muted">times like “10 minutes” become timers</span>
-        </span>
-        <ol className="flex flex-col gap-3">
+        <button type="button" onClick={() => setRows([...rows, { ...emptyRow }])} className={btnDashed}>
+          <PlusIcon className="h-3.5 w-3.5 text-accent" />
+          <span>Add Ingredient</span>
+        </button>
+      </div>
+
+      {/* Method */}
+      <div className={`${panelCls} space-y-3 p-4`}>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold">Method Steps</h2>
+          <span className="text-[10px] text-muted">Time phrases auto-create timers</span>
+        </div>
+
+        <div className="space-y-2.5">
           {steps.map((s, i) => (
-            <li key={i} className="flex items-start gap-2">
-              <span className="mt-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft text-sm font-semibold text-accent">{i + 1}</span>
-              <textarea aria-label={`Step ${i + 1}`} dir="auto" rows={2} value={s} onChange={(e) => setStep(i, e.target.value)} className={inputCls} />
-              <div className="flex shrink-0 flex-col">
-                <button type="button" aria-label="Move step up" disabled={i === 0} onClick={() => moveStep(i, -1)} className="flex h-8 w-9 items-center justify-center rounded-lg text-muted active:bg-accent-soft disabled:opacity-30">
-                  ↑
-                </button>
-                <button type="button" aria-label="Move step down" disabled={i === steps.length - 1} onClick={() => moveStep(i, 1)} className="flex h-8 w-9 items-center justify-center rounded-lg text-muted active:bg-accent-soft disabled:opacity-30">
-                  ↓
-                </button>
-                <button type="button" aria-label="Remove step" onClick={() => setSteps(steps.length > 1 ? steps.filter((_, idx) => idx !== i) : [""])} className="flex h-8 w-9 items-center justify-center rounded-lg text-muted active:bg-accent-soft">
-                  ✕
-                </button>
+            <div key={i} className={`${rowCls} space-y-2 p-3`}>
+              <div className="flex items-center justify-between">
+                <span className="inline-flex items-center gap-1.5 text-xs font-bold">
+                  <span className="flex h-5 w-5 items-center justify-center rounded-md bg-foreground text-[11px] text-background">{i + 1}</span>
+                  <span>Step {i + 1}</span>
+                </span>
+                <div className="flex items-center gap-1">
+                  <button type="button" aria-label="Move step up" title="Move Step Up" disabled={i === 0} onClick={() => moveStep(i, -1)} className={stepBtn}>
+                    <ArrowUpIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" aria-label="Move step down" title="Move Step Down" disabled={i === steps.length - 1} onClick={() => moveStep(i, 1)} className={stepBtn}>
+                    <ArrowDownIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" aria-label="Delete step" title="Delete Step" onClick={() => setSteps(steps.length > 1 ? steps.filter((_, idx) => idx !== i) : [""])} className="flex h-7 w-7 items-center justify-center rounded-lg border border-line text-muted-2 transition hover:border-rose-200 hover:text-rose-600 active:border-rose-200 active:text-rose-600">
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
-            </li>
+              <textarea aria-label={`Step ${i + 1}`} dir="auto" rows={2} placeholder="Describe this cooking step..." value={s} onChange={(e) => setStep(i, e.target.value)} className="w-full rounded-lg border border-line bg-accent-soft/70 p-2.5 text-base leading-relaxed outline-none transition focus:border-foreground focus:bg-card" />
+            </div>
           ))}
-        </ol>
-        <button type="button" onClick={() => setSteps([...steps, ""])} className={`${btnText} mt-1`}>
-          + Add step
-        </button>
-      </section>
-
-      <section>
-        <span className={sectionTitle}>Category</span>
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Categories">
-          {allCategories.map((id) => {
-            const on = categories.includes(id);
-            return (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={on}
-                onClick={() => toggleCategory(id)}
-                className={filterChip(on)}
-              >
-                {categoryLabel(id, he ? "he" : "en")}
-              </button>
-            );
-          })}
         </div>
-        <div className="mt-3 flex gap-2">
-          <input
-            dir="auto"
-            placeholder="Add your own category"
-            value={customCategory}
-            onChange={(e) => setCustomCategory(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                addCustomCategory();
-              }
-            }}
-            className={inputCls}
-          />
-          <button type="button" onClick={addCustomCategory} className={btnGhost}>
-            Add
-          </button>
-        </div>
-      </section>
 
-      <section>
-        <span className={sectionTitle}>Tags</span>
-        <TagEditor
-          tags={tags}
-          suggested={suggested}
-          onChange={(t, s) => {
-            setTags(t);
-            setSuggested(s);
-          }}
-        />
-      </section>
-
-      <section>
-        <label htmlFor="source" className={sectionTitle}>
-          Source link
-        </label>
-        <input id="source" dir="ltr" value={sourceUrl} onChange={(e) => setSourceUrl(e.target.value)} className={inputCls} />
-      </section>
-
-      {error && (
-        <p role="alert" className="text-sm text-red-600">
-          {error}
-        </p>
-      )}
-      <div className="sticky bottom-0 -mx-4 flex flex-col gap-1 bg-background/95 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur">
-        {suggested.length > 0 && <p className="text-center text-xs text-muted">{suggested.length} suggested tag(s) not accepted won&apos;t be saved</p>}
-        <button type="submit" disabled={busy} className={`${btnPrimary} w-full`}>
-          {busy ? "Saving…" : editing ? "Save changes" : "Save"}
+        <button type="button" onClick={() => setSteps([...steps, ""])} className={btnDashed}>
+          <PlusIcon className="h-3.5 w-3.5 text-accent" />
+          <span>Add Step</span>
         </button>
       </div>
     </form>

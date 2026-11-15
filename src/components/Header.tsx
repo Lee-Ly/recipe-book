@@ -1,22 +1,24 @@
 import Link from "next/link";
+import { PlusIcon } from "./icons";
 import SiteHeader from "./SiteHeader";
-import { headerTitleCls } from "./ui";
+import { btnPrimary, headerTitleCls } from "./ui";
 
-/** Home header: the logo on the left, the add button on the right. */
+/** Home header: logo mark and name on the left, the add button on the right. */
 export default function Header() {
   return (
     <SiteHeader
       left={
-        <Link href="/" className={headerTitleCls}>
-          Recipe Book<span className="text-accent">.</span>
+        <Link href="/" className="flex items-center gap-2">
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-foreground text-sm font-bold text-background">R.</span>
+          <span className={headerTitleCls}>
+            Recipe Book<span className="text-accent">.</span>
+          </span>
         </Link>
       }
       right={
-        <Link href="/add" className="inline-flex min-h-11 items-center gap-1.5 rounded-xl bg-accent px-4 text-sm font-bold text-accent-fg active:opacity-80">
-          <span aria-hidden className="text-lg leading-none">
-            +
-          </span>
-          New
+        <Link href="/add" className={btnPrimary}>
+          <PlusIcon />
+          <span>New</span>
         </Link>
       }
     />

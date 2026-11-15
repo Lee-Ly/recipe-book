@@ -25,11 +25,13 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 - **Timers**: a time in a step (also Hebrew; "חצי שעה" = 30 min; 1 hour = 60 min) is a tappable timer in minutes:seconds. Starting one turns Awake on. The alarm is a chime synthesized in the page (`timer-store.ts`), not a system sound. Phones may pause the page when the screen locks, so the alarm is reliable only while the page is open.
 - **Auth**: single owner password (`APP_PASSWORD`), signed cookie. Public pages are only `/s/[token]` and `/login`. The share page gets recipes with `notes` and `favorite` stripped, because `RecipeView` is a client component and its props reach the visitor's browser.
 
-## Design system (set once in `src/components/ui.ts`, never per page)
-- Colors in `src/app/globals.css`: orange `#ff5722` (accent, from the mockup), background `#fffefd`, fields/grey `#f6f6f6`, thin border `#e6e4e2`, chip text dark grey `#4a4846` (never black). Dark mode follows the phone.
-- Header: `SiteHeader` on every page: same height, thin line under it, pinned, always left-to-right. Logo "Recipe Book." left and "+ New" right on home; "חזור" back button left on other pages.
-- Buttons and fields: 12px radius (`rounded-xl`). Cards and panels: 16px with a thin border. Category chips in rows: fully round, bold dark grey, thin border. Category badge: 6px, bold, border. Tag badge: 6px, regular text, no border. Fields get a thin near-black border on focus.
-- Method steps are bordered cards; the current step has a black border.
+## Design system (copied from the mockup; set once in `src/components/ui.ts` + `src/app/globals.css`, never per page)
+- The mockup HTML is the reference for every color, size, height, border, font weight, margin, radius and hover/pressed effect. Read its Tailwind classes before restyling anything.
+- Colors: orange `#ff5722` (pressed `#e64a19`), page `#fffefd` and grey `#f6f6f6` (the owner chose these), text `#111`, thin borders `#e2e8f0`, grey text `#64748b`, dark-grey chip text `#475569`. Dark mode follows the phone.
+- `SiteHeader`: 61px, always left-to-right, thin line under it, pinned. Home: black "R." square + name left, "+ New" right. Recipe: back ("חזור") left; pencil, heart, Awake right. New/edit: Cancel left, title centre, orange Save right (the Save button submits the form through `form="recipe-form"`). Pages have 20px side padding.
+- Buttons 12px radius, text-xs bold (orange / black / white-outlined / plain back); icon buttons 36px; cards, panels and step cards 16px with a thin border that turns black on hover/press; round category chips (selected = black); card badges 6px; recipe-page badges 8px. Fields are 12px radius with a thin border that turns black on focus, and use 16px text (14px makes phones zoom).
+- Where the owner deviated from the mockup, the owner wins: card tags have regular weight and no border; the author line on cards; the heart sits on the card photo.
+- The new/edit screens are left-to-right with English labels (as in the mockup); fields use `dir="auto"`.
 
 ## Layout
 - `src/lib/extract.ts`: link fetch, page parsing, Gemini, fallback parser, author guess
@@ -44,7 +46,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 `GEMINI_API_KEY`, `APP_PASSWORD`, `SESSION_SECRET`, optional `GEMINI_MODEL`.
 
 ## Not done yet
-- Pages reviewed so far: home and recipe. Still to review with the owner: add/edit recipe screen, login, share page.
+- All three screens were rebuilt to follow the mockup on 2026-11-15; the owner reviews page by page for remaining differences. Login and the share page have had less attention.
 - Hebrew translation of the remaining English buttons and labels (waiting for the owner's decision).
 - The owner's pan-size conversion rules.
 - Hosted database and image storage (Supabase), deployment (Vercel), image resizing, a login rate limiter. The local `data/` folder only works on one machine. Android share-into-app and install need the site online over HTTPS.

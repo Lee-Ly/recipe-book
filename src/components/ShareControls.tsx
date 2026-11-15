@@ -41,7 +41,7 @@ export default function ShareControls({ id, initialToken }: { id: string; initia
 
   if (!token) {
     return (
-      <button type="button" onClick={() => update(true)} disabled={busy} className={btnGhost}>
+      <button type="button" onClick={() => update(true)} disabled={busy} className={`${btnGhost} w-full`}>
         Create share link
       </button>
     );
@@ -51,16 +51,16 @@ export default function ShareControls({ id, initialToken }: { id: string; initia
   return (
     <div className={`flex flex-col gap-3 ${panelCls} p-4`}>
       <p className="text-sm">Anyone with this link can view this recipe, but not change it.</p>
-      <input readOnly value={link} dir="ltr" aria-label="Share link" className={`${inputCls} bg-card text-sm`} onFocus={(e) => e.currentTarget.select()} />
-      <button type="button" onClick={() => share(link)} className={`${btnPrimary} min-h-11 text-sm`}>
+      <input readOnly value={link} dir="ltr" aria-label="Share link" className={`${inputCls} text-sm`} onFocus={(e) => e.currentTarget.select()} />
+      <button type="button" onClick={() => share(link)} className={`${btnPrimary} w-full py-2.5`}>
         {copied ? "Copied ✓" : "Send link"}
       </button>
       {origin.includes("localhost") && <p className="text-xs text-muted">This link only works on this computer until the site is online.</p>}
       <div className="flex gap-4">
-        <button type="button" onClick={() => update(false)} disabled={busy} className={`${btnText} text-muted`}>
+        <button type="button" onClick={() => update(false)} disabled={busy} className={`${btnText} !text-muted`}>
           Stop sharing
         </button>
-        <button type="button" onClick={() => update(true, true)} disabled={busy} className={`${btnText} text-muted`}>
+        <button type="button" onClick={() => update(true, true)} disabled={busy} className={`${btnText} !text-muted`}>
           New link
         </button>
       </div>

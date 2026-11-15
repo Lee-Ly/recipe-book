@@ -26,7 +26,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
     <>
       <Header />
       {recipes.length === 0 ? (
-        <div className="mt-20 flex flex-col items-center gap-4 text-center">
+        <div className="mt-16 flex flex-col items-center gap-4 text-center">
           <p className="text-5xl">🍰</p>
           <h1 className="text-xl font-semibold">Your recipe book is empty</h1>
           <p className="text-muted">Paste a link to your first recipe and it will show up here.</p>

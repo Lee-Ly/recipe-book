@@ -1,15 +1,20 @@
 @import "tailwindcss";
 
+/* Colors taken from the mockup. The owner's own choices stay: page #fffefd, grey fields #f6f6f6, orange #ff5722. */
 :root {
   --background: #fffefd;
-  --foreground: #1c1b1a;
+  --foreground: #111111;
   --card: #ffffff;
-  --line: #e6e4e2;
-  --muted: #7d7a77;
+  --line: #e2e8f0; /* slate-200 */
+  --line-strong: #cbd5e1; /* slate-300 */
+  --muted: #64748b; /* slate-500 */
+  --muted-2: #94a3b8; /* slate-400 */
+  --chip-text: #475569; /* slate-600 */
+  --ink-2: #334155; /* slate-700 */
   --accent: #ff5722;
+  --accent-hover: #e64a19;
   --accent-fg: #ffffff;
   --accent-soft: #f6f6f6;
-  --chip-text: #4a4846;
 }
 
 @theme inline {
@@ -17,25 +22,33 @@
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
   --color-muted: var(--muted);
+  --color-muted-2: var(--muted-2);
+  --color-chip-text: var(--chip-text);
+  --color-ink-2: var(--ink-2);
   --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
   --color-accent-fg: var(--accent-fg);
   --color-accent-soft: var(--accent-soft);
-  --color-chip-text: var(--chip-text);
   --font-sans: var(--font-dm-sans), var(--font-open-sans);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #131211;
-    --foreground: #f4f2ef;
-    --card: #1b1a18;
-    --line: #2c2a28;
-    --muted: #a09b96;
+    --background: #0f1114;
+    --foreground: #f1f5f9;
+    --card: #171a1e;
+    --line: #2a2e35;
+    --line-strong: #3a3f48;
+    --muted: #94a3b8;
+    --muted-2: #64748b;
+    --chip-text: #cbd5e1;
+    --ink-2: #e2e8f0;
     --accent: #ff7043;
-    --accent-fg: #1a1007;
-    --accent-soft: #211f1d;
-    --chip-text: #cfcac5;
+    --accent-hover: #ff8a65;
+    --accent-fg: #1a0f08;
+    --accent-soft: #1c1f24;
   }
 }
 
@@ -44,4 +57,13 @@ body {
   color: var(--foreground);
   font-family: var(--font-dm-sans), var(--font-open-sans), "Segoe UI", Arial, "Arial Hebrew", sans-serif;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide the scrollbar on the sideways category row, like the mockup. */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

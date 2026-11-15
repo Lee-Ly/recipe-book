@@ -1,10 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { btnGhost } from "./ui";
+import { ArrowLeftIcon, XIcon } from "./icons";
+import { btnBack } from "./ui";
 
-/** "חזור" with the arrow on the left. Goes to the previous page, or to `fallback` when there is none. */
-export default function BackButton({ fallback = "/" }: { fallback?: string }) {
+/**
+ * Back to the previous page, or to `fallback` when there is none.
+ * "back" is "חזור" with an arrow (recipe page); "cancel" is an X with "Cancel" (new/edit screens), like the mockup.
+ */
+export default function BackButton({ fallback = "/", variant = "back" }: { fallback?: string; variant?: "back" | "cancel" }) {
   const router = useRouter();
   return (
     <button
@@ -13,10 +17,10 @@ export default function BackButton({ fallback = "/" }: { fallback?: string }) {
         if (window.history.length > 1) router.back();
         else router.push(fallback);
       }}
-      className={`${btnGhost} gap-2 px-4 font-bold`}
+      className={btnBack}
     >
-      <span aria-hidden>←</span>
-      חזור
+      {variant === "back" ? <ArrowLeftIcon /> : <XIcon />}
+      {variant === "back" ? "חזור" : "Cancel"}
     </button>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { btnGhost, inputCls, tagChip } from "./ui";
+import { btnDark, btnText, inputCls } from "./ui";
 
 interface Props {
   tags: string[];
@@ -9,61 +9,26 @@ interface Props {
   onChange: (tags: string[], suggested: string[]) => void;
 }
 
-const iconBtn = "-me-2 flex h-9 w-9 items-center justify-center text-muted active:text-foreground";
-
-/** Accepted tags are solid chips (✕ removes). Suggestions are outlined chips: tap to accept, ✕ to dismiss. */
+/**
+ * Tags as in the mockup: an input with a black "+ Add" button, accepted tags as white chips with ×.
+ * Suggested tags are dashed chips: tap to accept, × to dismiss.
+ */
 export default function TagEditor({ tags, suggested, onChange }: Props) {
   const [draft, setDraft] = useState("");
 
   function add() {
     const t = draft.trim().replace(/^#/, "");
     setDraft("");
-    if (!t || tags.includes(t)) return;
+    if (!t || tags.some((x) => x.toLowerCase() === t.toLowerCase())) return;
     onChange([...tags, t], suggested.filter((s) => s !== t));
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {tags.length > 0 && (
-        <ul className="flex flex-wrap gap-2" aria-label="Accepted tags">
-          {tags.map((t) => (
-            <li key={t} className={`${tagChip} bg-accent pe-2 ps-4 font-medium text-accent-fg`}>
-              <span dir="auto">#{t}</span>
-              <button type="button" aria-label={`Remove tag ${t}`} onClick={() => onChange(tags.filter((x) => x !== t), suggested)} className="flex h-9 w-7 items-center justify-center opacity-80">
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      {suggested.length > 0 && (
-        <div>
-          <p className="mb-2 flex items-center justify-between text-sm text-muted">
-            Suggested: tap to accept
-            <button type="button" className="min-h-9 px-1 font-medium text-accent" onClick={() => onChange([...tags, ...suggested.filter((s) => !tags.includes(s))], [])}>
-              Accept all
-            </button>
-          </p>
-          <ul className="flex flex-wrap gap-2" aria-label="Suggested tags">
-            {suggested.map((t) => (
-              <li key={t} className={`${tagChip} border border-dashed border-muted pe-1 ps-4`}>
-                <button type="button" dir="auto" className="min-h-9" onClick={() => onChange([...tags, t], suggested.filter((x) => x !== t))} aria-label={`Accept tag ${t}`}>
-                  + #{t}
-                </button>
-                <button type="button" aria-label={`Dismiss suggestion ${t}`} onClick={() => onChange(tags, suggested.filter((x) => x !== t))} className={iconBtn}>
-                  ✕
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      <div className="flex gap-2">
+    <div className="space-y-2.5">
+      <div className="flex items-center gap-2">
         <input
           dir="auto"
-          placeholder="Add your own tag"
+          placeholder="Add a tag (e.g., Spicy, Comfort)..."
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -72,12 +37,50 @@ export default function TagEditor({ tags, suggested, onChange }: Props) {
               add();
             }
           }}
-          className={inputCls}
+          className={`${inputCls} min-w-0 flex-1 py-2`}
         />
-        <button type="button" onClick={add} className={btnGhost}>
-          Add
+        <button type="button" onClick={add} className={btnDark}>
+          + Add
         </button>
       </div>
+
+      <div className="flex min-h-[26px] flex-wrap gap-1.5" aria-label="Accepted tags">
+        {tags.length === 0 ? (
+          <span className="text-[11px] italic text-muted-2">No tags added yet</span>
+        ) : (
+          tags.map((t) => (
+            <span key={t} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card px-2.5 py-1 text-xs font-semibold">
+              <span dir="auto">{t}</span>
+              <button type="button" aria-label={`Remove tag ${t}`} onClick={() => onChange(tags.filter((x) => x !== t), suggested)} className="font-bold text-muted-2 transition hover:text-accent active:text-accent">
+                &times;
+              </button>
+            </span>
+          ))
+        )}
+      </div>
+
+      {suggested.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="flex items-center justify-between text-[11px] font-medium text-muted">
+            <span>Suggested: tap to accept. Tags you don&apos;t accept aren&apos;t saved.</span>
+            <button type="button" className={btnText} onClick={() => onChange([...tags, ...suggested.filter((s) => !tags.includes(s))], [])}>
+              Accept all
+            </button>
+          </p>
+          <div className="flex flex-wrap gap-1.5" aria-label="Suggested tags">
+            {suggested.map((t) => (
+              <span key={t} className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-line-strong bg-card px-2.5 py-1 text-xs font-semibold text-chip-text">
+                <button type="button" dir="auto" aria-label={`Accept tag ${t}`} onClick={() => onChange([...tags, t], suggested.filter((x) => x !== t))} className="transition hover:text-foreground active:text-foreground">
+                  + {t}
+                </button>
+                <button type="button" aria-label={`Dismiss suggestion ${t}`} onClick={() => onChange(tags, suggested.filter((x) => x !== t))} className="font-bold text-muted-2 transition hover:text-accent active:text-accent">
+                  &times;
+                </button>
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { btnText } from "./ui";
+
 
 export default function DeleteButton({ id, title }: { id: string; title: string }) {
   const router = useRouter();
@@ -21,7 +21,7 @@ export default function DeleteButton({ id, title }: { id: string; title: string 
   }
 
   return (
-    <button type="button" onClick={remove} disabled={busy} className={`${btnText} self-start text-red-600`}>
+    <button type="button" onClick={remove} disabled={busy} className="self-start py-1 text-xs font-bold text-red-600 transition hover:underline active:underline disabled:opacity-50">
       Delete recipe
     </button>
   );
