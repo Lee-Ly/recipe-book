@@ -4,13 +4,14 @@ import RecipeForm from "@/components/RecipeForm";
 import SiteHeader from "@/components/SiteHeader";
 import { btnPrimary } from "@/components/ui";
 import { requireAuth } from "@/lib/auth";
-import { getRecipe } from "@/lib/store";
+import { getRecipe, getTaxonomy } from "@/lib/store";
 
 export default async function EditRecipePage({ params }: PageProps<"/recipes/[id]/edit">) {
   await requireAuth();
   const { id } = await params;
   const recipe = await getRecipe(id);
   if (!recipe) notFound();
+  const taxonomy = await getTaxonomy();
   return (
     <>
       <SiteHeader
@@ -23,7 +24,7 @@ export default async function EditRecipePage({ params }: PageProps<"/recipes/[id
         }
       />
       <div dir="ltr" className="mx-auto max-w-2xl pb-4 pt-4">
-        <RecipeForm mode={{ kind: "edit", id }} initial={{ ...recipe, remoteImageUrl: "", storedImage: recipe.image }} />
+        <RecipeForm mode={{ kind: "edit", id }} categories={taxonomy.categories} tagPool={taxonomy.tags} initial={{ ...recipe, remoteImageUrl: "", storedImage: recipe.image }} />
       </div>
     </>
   );

@@ -31,6 +31,8 @@ export function formatAmount(ing: Ingredient, language: string, unit: UnitMode =
   const he = language === "he";
   // Cups written in the source are exact; everything else is an estimate when the line was converted.
   const cupsWritten = /כוס|cup/i.test(ing.original);
+  const gramsWritten = /גרם|\d\s*g(r|rams?)?\b/i.test(ing.original);
+  const mlWritten = /מ"ל|מ״ל|\d\s*ml\b/i.test(ing.original);
   // Hebrew gets the word-prefix כ־ ("about"): a bare "~" can jump to the wrong side of a number in right-to-left text.
   const approx = (exact: boolean) => (ing.converted && !exact ? (he ? "כ־" : "~") : "");
   const order: UnitMode[] = [unit, ...(["grams", "ml", "cups"] as const).filter((u) => u !== unit)];
@@ -42,8 +44,13 @@ export function formatAmount(ing: Ingredient, language: string, unit: UnitMode =
       const word = he ? (n > 1 ? "כוסות" : "כוס") : n > 1 ? "cups" : "cup";
       return `${approx(cupsWritten)}${formatCups(n)} ${word}`;
     }
-    if (u === "grams") return `${approx(false)}${round(n)} ${he ? "גרם" : "g"}`;
-    return `${approx(false)}${round(n)} ${he ? "מ״ל" : "ml"}`;
+    if (u === "grams") return `${approx(gramsWritten)}${round(n)} ${he ? "גרם" : "g"}`;
+    return `${approx(mlWritten)}${round(n)} ${he ? "מ״ל" : "ml"}`;
+  }
+  // Nothing to convert (for example "2 pcs"): scale the number written in front.
+  if (factor !== 1) {
+    const m = /^(\d+(?:[.,]\d+)?)(.*)$/.exec(ing.original.trim());
+    if (m) return `${Math.round(Number(m[1].replace(",", ".")) * factor * 100) / 100}${m[2]}`;
   }
   return ing.original;
 }
@@ -59,15 +66,15 @@ export function formatDuration(minutes: number, language: string): string {
 
 export const LABELS = {
   he: {
-    ingredients: "מצרכים", steps: "אופן ההכנה", oven: "תנור", time: "זמן כולל", source: "מקור", estimate: "כ־ = המרה משוערת",
+    ingredients: "מצרכים", steps: "אופן ההכנה", oven: "תנור", time: "זמן אפייה/בישול", source: "מקור", estimate: "כ־ = המרה משוערת",
     units: { cups: "כוסות", grams: "גרם", ml: "מ״ל" }, serves: "מספר סועדים", pan: "תבנית", notes: "הערות", addNote: "הוספת הערה",
-    edit: "עריכה", save: "שמירה", cancel: "ביטול", setPan: "הגדרת גודל תבנית מקורי", setServings: "הגדרת מספר סועדים", bakingIn: "אופים בתבנית", reset: "איפוס",
+    tags: "תגיות", edit: "עריכה", save: "שמירה", cancel: "ביטול", setPan: "הגדרת גודל תבנית מקורי", setServings: "הגדרת מספר סועדים", bakingIn: "אופים בתבנית", reset: "איפוס",
     round: "עגולה", square: "מרובעת", rect: "מלבנית", prepped: "הוכנו",
   },
   en: {
-    ingredients: "Ingredients", steps: "Method", oven: "Oven", time: "Total time", source: "Source", estimate: "~ = estimated conversion",
+    ingredients: "Ingredients", steps: "Method", oven: "Oven", time: "Cook time", source: "Source", estimate: "~ = estimated conversion",
     units: { cups: "Cups", grams: "Grams", ml: "ml" }, serves: "Serves", pan: "Pan", notes: "Notes", addNote: "Add a note",
-    edit: "Edit", save: "Save", cancel: "Cancel", setPan: "Set the original pan size", setServings: "Set how many it serves", bakingIn: "Baking in", reset: "Reset",
+    tags: "Tags", edit: "Edit", save: "Save", cancel: "Cancel", setPan: "Set the original pan size", setServings: "Set how many it serves", bakingIn: "Baking in", reset: "Reset",
     round: "Round", square: "Square", rect: "Rectangle", prepped: "prepped",
   },
 };

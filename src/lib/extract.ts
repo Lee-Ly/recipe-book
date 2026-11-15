@@ -1,5 +1,6 @@
 import { parseWithRules } from "./fallback-parser";
 import { geminiConfigured, structureWithGemini } from "./gemini";
+import { getTaxonomy } from "./store";
 import { parsePage, type PageInfo } from "./page-parse";
 import { isSocialHost, parsePublicUrl, safeFetch } from "./safe-fetch";
 import type { ExtractResult } from "./types";
@@ -51,7 +52,8 @@ export async function extractRecipe(rawUrl: string, pastedText: string): Promise
 
   if (source && geminiConfigured()) {
     try {
-      draft = await structureWithGemini(source);
+      const taxonomy = await getTaxonomy();
+      draft = await structureWithGemini(source, taxonomy.categories, taxonomy.tags);
       usedAi = true;
     } catch (err) {
       console.error("Gemini extraction failed:", err instanceof Error ? err.message : err);

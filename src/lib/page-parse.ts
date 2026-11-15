@@ -110,11 +110,12 @@ export function parsePage(html: string): PageInfo {
   if (recipe) {
     const ingredients = asArray(recipe.recipeIngredient as string[] | string | undefined).map((s) => decodeEntities(String(s)));
     const steps = instructionLines(recipe.recipeInstructions).map(decodeEntities);
-    const minutes = isoDurationToMinutes(recipe.totalTime);
+    // Baking / cooking time only, never preparation or total time.
+    const minutes = isoDurationToMinutes(recipe.cookTime);
     recipeText = [
       `Title: ${decodeEntities(String(recipe.name ?? title ?? ""))}`,
       recipe.recipeYield ? `Yield: ${asArray(recipe.recipeYield as string).join(" ")}` : "",
-      minutes ? `Total time: ${minutes} minutes` : "",
+      minutes ? `Baking/cooking time: ${minutes} minutes` : "",
       "Ingredients:",
       ...ingredients,
       "Instructions:",

@@ -1,5 +1,6 @@
 import AddRecipe from "@/components/AddRecipe";
 import { requireAuth } from "@/lib/auth";
+import { getTaxonomy } from "@/lib/store";
 
 function first(v: string | string[] | undefined): string {
   return (Array.isArray(v) ? v[0] : v) ?? "";
@@ -16,5 +17,6 @@ export default async function AddPage({ searchParams }: PageProps<"/add">) {
   for (const k of ["url", "text", "title"]) if (first(sp[k])) back.set(k, first(sp[k]));
   await requireAuth(back.size > 0 ? `/add?${back}` : "/add");
 
-  return <AddRecipe initialUrl={sharedUrl} initialText={sharedText} />;
+  const taxonomy = await getTaxonomy();
+  return <AddRecipe initialUrl={sharedUrl} initialText={sharedText} categories={taxonomy.categories} tagPool={taxonomy.tags} />;
 }

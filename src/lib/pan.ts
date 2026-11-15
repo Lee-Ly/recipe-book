@@ -1,10 +1,9 @@
+import type { Category } from "./categories";
 import type { Pan } from "./types";
 
-/** Categories that make a recipe a baking recipe (scaled by pan size instead of servings). */
-const BAKING = new Set(["cookies", "cake", "bread", "dessert"]);
-
-export function isBaking(categories: string[]): boolean {
-  return categories.some((c) => BAKING.has(c));
+/** A recipe is a baking recipe (scaled by pan size instead of servings) when one of its categories is marked as baking. */
+export function isBaking(recipeCategories: string[], categories: Category[]): boolean {
+  return recipeCategories.some((id) => categories.find((c) => c.id === id)?.baking);
 }
 
 export const PAN_SHAPES: { id: Pan["shape"]; label: string }[] = [

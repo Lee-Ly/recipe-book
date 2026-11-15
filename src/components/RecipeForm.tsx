@@ -1,14 +1,16 @@
 "use client";
 
 /* eslint-disable @next/next/no-img-element */
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
-import { categoryLabel, DEFAULT_CATEGORIES } from "@/lib/categories";
+import { categoryName, type Category } from "@/lib/categories";
 import { PAN_SHAPES } from "@/lib/pan";
 import type { Ingredient, Pan, RecipeDraft } from "@/lib/types";
+import { UNITS, type Unit } from "@/lib/units";
 import { ArrowDownIcon, ArrowUpIcon, PlusIcon, TrashIcon } from "./icons";
 import TagEditor from "./TagEditor";
-import { btnDark, btnDashed, btnGhost, btnText, categoryToggle, fieldLabel, inputCls, panelCls, rowCls } from "./ui";
+import { btnDashed, btnGhost, btnText, categoryToggle, fieldLabel, inputCls, panelCls, rowCls } from "./ui";
 
 export interface FormInitial extends RecipeDraft {
   sourceUrl: string;
@@ -20,8 +22,15 @@ export interface FormInitial extends RecipeDraft {
 
 type Mode = { kind: "create" } | { kind: "edit"; id: string };
 
+/**
+ * One ingredient in the editor: an amount and one unit, as in the mockup. Rows the owner has not touched keep the
+ * cups/grams/ml they came with; typed or changed rows are converted into the other units by the site when saved.
+ */
 interface IngredientRow {
   name: string;
+  amount: string;
+  unit: Unit;
+  touched: boolean;
   original: string;
   cups: string;
   grams: string;
@@ -29,45 +38,69 @@ interface IngredientRow {
   converted: boolean;
 }
 
-const toRow = (i: Ingredient): IngredientRow => ({
-  name: i.name,
-  original: i.original,
-  cups: i.cups?.toString() ?? "",
-  grams: i.grams?.toString() ?? "",
-  ml: i.ml?.toString() ?? "",
-  converted: i.converted,
-});
+const short = (n: number) => String(Math.round(n * 100) / 100);
+
+function toRow(i: Ingredient): IngredientRow {
+  const base = { name: i.name, touched: false, original: i.original, cups: i.cups?.toString() ?? "", grams: i.grams?.toString() ?? "", ml: i.ml?.toString() ?? "", converted: i.converted };
+  // Show the unit the source was written in, then grams, then ml, then cups.
+  if (/כוס|cup/i.test(i.original) && i.cups != null) return { ...base, amount: short(i.cups), unit: "cups" };
+  if (i.grams != null) return { ...base, amount: short(i.grams), unit: "g" };
+  if (i.ml != null) return { ...base, amount: short(i.ml), unit: "ml" };
+  if (i.cups != null) return { ...base, amount: short(i.cups), unit: "cups" };
+  const lead = /^\s*(\d+(?:[.,]\d+)?)/.exec(i.original);
+  return { ...base, amount: lead ? lead[1] : "", unit: "pcs" };
+}
+
+const emptyRow = (): IngredientRow => ({ name: "", amount: "", unit: "g", touched: true, original: "", cups: "", grams: "", ml: "", converted: false });
 
 const toNumber = (s: string): number | null => {
   const n = parseFloat(s);
   return Number.isFinite(n) ? n : null;
 };
 
-const emptyRow: IngredientRow = { name: "", original: "", cups: "", grams: "", ml: "", converted: false };
+const UNIT_WORDS: [RegExp, Unit][] = [
+  [/^(g|gr|gram|grams|גרם|גר)$/i, "g"],
+  [/^(ml|מ"ל|מ״ל)$/i, "ml"],
+  [/^(cup|cups|כוס|כוסות)$/i, "cups"],
+  [/^(tbsp|כף|כפות)$/i, "tbsp"],
+  [/^(tsp|כפית|כפיות)$/i, "tsp"],
+  [/^oz$/i, "oz"],
+  [/^(pcs|pc|יחידה|יחידות)$/i, "pcs"],
+];
 
-/** "350g potato gnocchi" or "2 כוסות קמח" -> a row with the number in the right unit; other lines become a plain name. */
+/** "350g potato gnocchi", "2 כוסות קמח", "3 eggs" -> a row. A line without a leading number becomes just a name. */
 function parseBulkLine(line: string): IngredientRow {
-  const m = /^(\d+(?:[.,]\d+)?)\s*(g|gr|גרם|גר|ml|מ״ל|מ"ל|cups?|כוסות|כוס)?\s+(.+)$/i.exec(line);
-  if (!m) return { ...emptyRow, name: line };
-  const n = m[1].replace(",", ".");
-  const unit = (m[2] ?? "").toLowerCase();
-  const row = { ...emptyRow, name: m[3], original: `${m[1]}${m[2] ? ` ${m[2]}` : ""}` };
-  if (/^(g|gr|גרם|גר)$/.test(unit)) row.grams = n;
-  else if (/^(ml|מ״ל|מ"ל)$/.test(unit)) row.ml = n;
-  else if (/^(cup|cups|כוס|כוסות)$/.test(unit)) row.cups = n;
-  else return { ...emptyRow, name: line };
-  return row;
+  const m = /^([\d.,/]+)\s*(\S+)?\s*(.*)$/.exec(line);
+  if (!m) return { ...emptyRow(), name: line };
+  const [a, b] = m[1].split("/");
+  const n = b ? Number(a) / Number(b) : Number(a.replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return { ...emptyRow(), name: line };
+  const token = m[2] ?? "";
+  const hit = UNIT_WORDS.find(([re]) => re.test(token));
+  const name = hit ? m[3] : [token, m[3]].filter(Boolean).join(" ");
+  return { ...emptyRow(), name: name || line, amount: short(n), unit: hit ? hit[1] : "pcs" };
 }
 
-const smallField = "w-full rounded-lg bg-accent-soft px-2 py-1.5 text-center text-base font-bold tabular-nums text-foreground outline-none focus:bg-card";
 const stepBtn = "flex h-7 w-7 items-center justify-center rounded-lg border border-line text-chip-text transition hover:border-foreground active:border-foreground disabled:opacity-30";
 
-export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { initial: FormInitial; mode: Mode; formId?: string }) {
+export default function RecipeForm({
+  initial,
+  mode,
+  categories,
+  tagPool,
+  formId = "recipe-form",
+}: {
+  initial: FormInitial;
+  mode: Mode;
+  categories: Category[];
+  tagPool: string[];
+  formId?: string;
+}) {
   const router = useRouter();
   const editing = mode.kind === "edit";
   const [title, setTitle] = useState(initial.title);
   const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl);
-  const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients.length ? initial.ingredients.map(toRow) : [{ ...emptyRow }]);
+  const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients.length ? initial.ingredients.map(toRow) : [emptyRow()]);
   const [steps, setSteps] = useState<string[]>(initial.steps.length ? initial.steps : [""]);
   const [author, setAuthor] = useState(initial.author);
   const [oven, setOven] = useState(initial.ovenCelsius?.toString() ?? "");
@@ -79,8 +112,7 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
   // When creating, suggested tags wait for your approval; when editing they are already accepted.
   const [tags, setTags] = useState<string[]>(editing ? initial.tags : []);
   const [suggested, setSuggested] = useState<string[]>(editing ? [] : initial.tags);
-  const [categories, setCategories] = useState<string[]>(initial.categories);
-  const [customCategory, setCustomCategory] = useState("");
+  const [selected, setSelected] = useState<string[]>(initial.categories);
   const [file, setFile] = useState<File | null>(null);
   const [removeImage, setRemoveImage] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
@@ -90,14 +122,14 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
 
   const preview = useMemo(() => (file ? URL.createObjectURL(file) : null), [file]);
   const shownImage = removeImage ? null : (preview ?? (initial.storedImage ? `/api/img/${initial.storedImage}` : initial.remoteImageUrl || null));
-
   const he = initial.language === "he";
-  const allCategories = [...DEFAULT_CATEGORIES.map((c) => c.id), ...categories.filter((c) => !DEFAULT_CATEGORIES.some((d) => d.id === c))];
+  // The recipe's own categories that no longer exist in the list are still shown, so nothing is lost silently.
+  const pickable = [...categories, ...selected.filter((id) => !categories.some((c) => c.id === id)).map((id) => ({ id, name: id }))];
 
   function setRow(i: number, patch: Partial<IngredientRow>) {
-    // Editing an amount means you've checked it, so it's no longer an estimate.
-    const touchesAmount = "cups" in patch || "grams" in patch || "ml" in patch;
-    setRows((cur) => cur.map((r, idx) => (idx === i ? { ...r, ...patch, ...(touchesAmount ? { converted: false } : {}) } : r)));
+    // Changing an amount or unit means the other units must be recalculated when saving.
+    const touches = "amount" in patch || "unit" in patch;
+    setRows((cur) => cur.map((r, idx) => (idx === i ? { ...r, ...patch, ...(touches ? { touched: true } : {}) } : r)));
   }
 
   function setStep(i: number, text: string) {
@@ -117,19 +149,13 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
   function parseBulk() {
     const lines = bulkText.split("\n").map((l) => l.trim()).filter(Boolean);
     if (lines.length === 0) return;
-    setRows((cur) => [...cur.filter((r) => r.name.trim() || r.original.trim()), ...lines.map(parseBulkLine)]);
+    setRows((cur) => [...cur.filter((r) => r.name.trim() || r.amount.trim()), ...lines.map(parseBulkLine)]);
     setBulkText("");
     setBulkOpen(false);
   }
 
   function toggleCategory(id: string) {
-    setCategories((cur) => (cur.includes(id) ? cur.filter((c) => c !== id) : [...cur, id]));
-  }
-
-  function addCustomCategory() {
-    const c = customCategory.trim();
-    if (c && !categories.includes(c)) setCategories([...categories, c]);
-    setCustomCategory("");
+    setSelected((cur) => (cur.includes(id) ? cur.filter((c) => c !== id) : [...cur, id]));
   }
 
   async function save(e: React.FormEvent) {
@@ -142,21 +168,18 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
     }
     setBusy(true);
     setError("");
-    const ingredients: Ingredient[] = rows
-      .filter((r) => r.name.trim() || r.original.trim())
-      .map((r) => ({
-        name: r.name.trim(),
-        original: r.original.trim(),
-        cups: toNumber(r.cups),
-        grams: toNumber(r.grams),
-        ml: toNumber(r.ml),
-        converted: r.converted,
-      }));
+    const ingredients = rows
+      .filter((r) => r.name.trim() || r.amount.trim() || (!r.touched && r.original.trim()))
+      .map((r) =>
+        r.touched
+          ? { name: r.name.trim(), amount: r.amount.trim(), unit: r.unit, convert: true }
+          : { name: r.name.trim(), original: r.original.trim(), cups: toNumber(r.cups), grams: toNumber(r.grams), ml: toNumber(r.ml), converted: r.converted },
+      );
     const cleanSteps = steps.map((s) => s.trim()).filter(Boolean);
     const a = toNumber(panA);
     const pan: Pan | null = panShape && a && a > 0 ? { shape: panShape, a, b: panShape === "rect" ? (toNumber(panB) ?? a) : null } : null;
     // A recipe typed by hand has no detected language, so it follows the letters used.
-    const typedHebrew = /[֐-׿]/.test([title, ...ingredients.map((i) => i.name), ...cleanSteps].join(" "));
+    const typedHebrew = /[֐-׿]/.test([title, ...rows.map((r) => r.name), ...cleanSteps].join(" "));
     const language = typedHebrew ? "he" : initial.title ? initial.language : "en";
     const data = {
       title: title.trim(),
@@ -169,7 +192,7 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
       servings: toNumber(servings),
       pan,
       tags,
-      categories,
+      categories: selected,
       sourceUrl: sourceUrl.trim(),
       imageUrl: removeImage || file ? "" : initial.remoteImageUrl,
       removeImage,
@@ -247,43 +270,31 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
         </div>
 
         <div>
-          <span className={fieldLabel}>Suggested Categories</span>
+          <span className={fieldLabel}>Categories</span>
+          <p className="-mt-0.5 mb-2 text-[11px] text-muted">The type of food, for example cookies or soup. Used to browse recipes.</p>
           <div className="flex flex-wrap gap-1.5" role="group" aria-label="Categories">
-            {allCategories.map((id) => {
-              const on = categories.includes(id);
+            {pickable.map((c) => {
+              const on = selected.includes(c.id);
               return (
-                <button key={id} type="button" aria-pressed={on} onClick={() => toggleCategory(id)} className={categoryToggle(on)}>
+                <button key={c.id} type="button" aria-pressed={on} onClick={() => toggleCategory(c.id)} className={categoryToggle(on)}>
                   {on ? "✓ " : ""}
-                  {categoryLabel(id, he ? "he" : "en")}
+                  {categoryName(pickable, c.id, he ? "he" : "en")}
                 </button>
               );
             })}
           </div>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              dir="auto"
-              placeholder="Add your own category"
-              value={customCategory}
-              onChange={(e) => setCustomCategory(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addCustomCategory();
-                }
-              }}
-              className={`${inputCls} min-w-0 flex-1 py-2`}
-            />
-            <button type="button" onClick={addCustomCategory} className={btnDark}>
-              + Add
-            </button>
-          </div>
+          <Link href="/manage" className={`${btnText} mt-2 inline-block`}>
+            Manage categories &amp; tags
+          </Link>
         </div>
 
         <div>
           <span className={fieldLabel}>Tags</span>
+          <p className="-mt-0.5 mb-2 text-[11px] text-muted">Keywords that describe this dish, for example spicy or 15 minutes. Used to search recipes.</p>
           <TagEditor
             tags={tags}
             suggested={suggested}
+            available={tagPool}
             onChange={(t, s) => {
               setTags(t);
               setSuggested(s);
@@ -308,7 +319,7 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
             <input type="number" inputMode="numeric" min="0" value={oven} onChange={(e) => setOven(e.target.value)} className={inputCls} />
           </label>
           <label>
-            <span className={fieldLabel}>Minutes</span>
+            <span className={fieldLabel}>Cook min</span>
             <input type="number" inputMode="numeric" min="0" value={minutes} onChange={(e) => setMinutes(e.target.value)} className={inputCls} />
           </label>
           <label>
@@ -316,6 +327,7 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
             <input type="number" inputMode="numeric" min="1" value={servings} onChange={(e) => setServings(e.target.value)} className={inputCls} />
           </label>
         </div>
+        <p className="text-[11px] text-muted">Cook min is the baking or cooking time only, not preparation.</p>
         <div>
           <span className={fieldLabel}>Pan size (for baking)</span>
           <div className="flex flex-wrap items-center gap-2">
@@ -351,12 +363,11 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
             Paste Bulk List
           </button>
         </div>
-
-        {rows.some((r) => r.converted) && <p className="text-[11px] text-muted">Amounts were converted automatically (cups, grams, ml). Worth a quick check, especially for baking.</p>}
+        <p className="text-[11px] text-muted">Type one amount and unit. Cups, grams and ml are worked out for you when you save.</p>
 
         {bulkOpen && (
           <div className={`${rowCls} space-y-2 p-3`}>
-            <textarea dir="auto" rows={3} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"350g potato gnocchi\n55g unsalted butter\n2 כוסות קמח"} className="w-full rounded-lg border border-line p-2 text-base outline-none focus:border-foreground" />
+            <textarea dir="auto" rows={3} value={bulkText} onChange={(e) => setBulkText(e.target.value)} placeholder={"350g potato gnocchi\n55g unsalted butter\n2 כוסות קמח"} className="w-full rounded-lg border border-line p-2 text-xs outline-none focus:border-foreground" />
             <div className="flex items-center justify-end gap-2">
               <button type="button" onClick={() => setBulkOpen(false)} className="px-2.5 py-1 text-xs font-semibold text-muted">
                 Close
@@ -370,38 +381,24 @@ export default function RecipeForm({ initial, mode, formId = "recipe-form" }: { 
 
         <div className="space-y-2">
           {rows.map((r, i) => (
-            <div key={i} className={`${rowCls} space-y-1.5 p-2`}>
-              <div className="flex items-center gap-1.5">
-                <input aria-label="Ingredient name" dir="auto" placeholder="Ingredient name..." value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 text-base font-medium outline-none placeholder:font-normal placeholder:text-muted-2" />
-                <button type="button" aria-label="Remove ingredient" onClick={() => setRows(rows.length > 1 ? rows.filter((_, idx) => idx !== i) : [{ ...emptyRow }])} className="p-1 text-muted-2 transition hover:text-rose-600 active:text-rose-600">
-                  <TrashIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {(["cups", "grams", "ml"] as const).map((f) => (
-                  <div key={f} className="relative">
-                    <input
-                      aria-label={f === "cups" ? "Cups" : f === "grams" ? "Grams" : "Milliliters"}
-                      type="number"
-                      dir="ltr"
-                      inputMode="decimal"
-                      step="any"
-                      min="0"
-                      value={r[f]}
-                      onChange={(e) => setRow(i, { [f]: e.target.value })}
-                      className={`${smallField} pe-9`}
-                    />
-                    <span aria-hidden className="pointer-events-none absolute end-2 top-1/2 -translate-y-1/2 text-[11px] font-bold text-muted-2">
-                      {f === "cups" ? "cup" : f === "grams" ? "g" : "ml"}
-                    </span>
-                  </div>
+            <div key={i} className={`flex items-center gap-1.5 p-2 ${rowCls}`}>
+              <input aria-label="Amount" dir="ltr" inputMode="decimal" placeholder="Amt" value={r.amount} onChange={(e) => setRow(i, { amount: e.target.value })} className="w-14 rounded-lg bg-accent-soft px-2 py-1.5 text-center text-xs font-bold tabular-nums text-foreground outline-none" />
+              <select aria-label="Unit" value={r.unit} onChange={(e) => setRow(i, { unit: e.target.value as Unit })} className="rounded-lg bg-accent-soft px-1.5 py-1.5 text-xs font-bold text-ink-2 outline-none">
+                {UNITS.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
                 ))}
-              </div>
+              </select>
+              <input aria-label="Ingredient name" dir="auto" placeholder="Ingredient name..." value={r.name} onChange={(e) => setRow(i, { name: e.target.value })} className="min-w-0 flex-1 bg-transparent px-1.5 py-1.5 text-xs font-medium text-foreground outline-none placeholder:font-normal placeholder:text-muted-2" />
+              <button type="button" aria-label="Remove ingredient" onClick={() => setRows(rows.length > 1 ? rows.filter((_, idx) => idx !== i) : [emptyRow()])} className="p-1 text-muted-2 transition hover:text-rose-600 active:text-rose-600">
+                <TrashIcon className="h-3.5 w-3.5" />
+              </button>
             </div>
           ))}
         </div>
 
-        <button type="button" onClick={() => setRows([...rows, { ...emptyRow }])} className={btnDashed}>
+        <button type="button" onClick={() => setRows([...rows, emptyRow()])} className={btnDashed}>
           <PlusIcon className="h-3.5 w-3.5 text-accent" />
           <span>Add Ingredient</span>
         </button>

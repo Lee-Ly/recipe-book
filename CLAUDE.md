@@ -17,6 +17,10 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 ## Rules that matter
 - **Keep the recipe's language**: Hebrew stays Hebrew, English stays English (title, ingredients, steps, tags, category labels on recipes). Never translate recipe content.
 - **Direction**: `<html dir="rtl" lang="he">`. The shared header is always `dir="ltr"`. A recipe sets its own direction by language. Use `dir="auto"` or `<bdi>` on user text; use logical Tailwind classes (`ps/pe/ms/me/start/end`), not left/right, except where a corner must be physical (the card heart is `right-*`).
+- **Categories vs tags**: a category is the TYPE of food (cookies, soup); a tag is a keyword describing one dish. Both are managed on `/manage` ("Categories & Tags": add, rename, delete; deleting or renaming updates every recipe). Categories live in `data/taxonomy.json` (defaults in `src/lib/categories.ts`); a category marked "Baking" scales by pan size. The AI may only pick categories from that list and prefers existing tags. Never confuse the two in UI text or prompts.
+- **Cook time**: `totalMinutes` is the baking/cooking time only, never preparation (prompt, `cookTime` from page data, form label "Cook min").
+- **Ingredient editor**: one amount + one unit (g, ml, cups, tbsp, tsp, oz, pcs) per row, like the mockup, in 12px text. Touched rows are converted into cups/grams/ml on the server when saved (`src/lib/convert.ts`: Gemini, with a density table fallback); untouched rows keep their stored values.
+- **Deleting** always asks first with `ConfirmDialog` (a page popup), never `window.confirm`, which phones and in-app browsers can block.
 - **Units**: a three-way switch shows cups, grams or ml. Celsius only. Converted values are estimates marked `~` (Hebrew `כ־`); cups written in the source are exact. Never show "0.02 cups".
 - **Tags are reviewed**: AI-suggested tags are not saved until the owner accepts them.
 - **Instagram/Facebook**: only the public caption and photo can be read. Never automate the owner's login. If the recipe isn't in the caption, the owner pastes the author's comment.
@@ -37,7 +41,8 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 - `src/lib/extract.ts`: link fetch, page parsing, Gemini, fallback parser, author guess
 - `src/lib/gemini.ts`: Gemini call, prompt and `normalizeDraft` (model via `GEMINI_MODEL`, falls back to `gemini-flash-latest`)
 - `src/lib/store.ts`: **all** storage (currently `data/recipes.json` + `data/images/`). Swap this one file to move to a hosted database. Old records get defaults for new fields when read.
-- `src/lib/steps.ts` (time detection), `pan.ts` (baking), `format.ts` (amounts and Hebrew/English labels), `timer-store.ts` (timers, chime, wake lock), `categories.ts`
+- `src/lib/convert.ts` (unit conversion on save), `categories.ts` (category/tag types), `units.ts`, `steps.ts` (time detection), `pan.ts` (baking), `format.ts` (amounts and Hebrew/English labels), `timer-store.ts` (timers, chime, wake lock), `categories.ts`
+- `src/app/manage/` + `ManageTaxonomy.tsx` (Categories & Tags page), `src/app/api/taxonomy`, `ConfirmDialog.tsx`
 - `src/components/`: `ui.ts` (shared styles), `SiteHeader`, `Header` (home), `BackButton`, `RecipeBar` (recipe header), `RecipeBrowser` (home), `RecipeView`, `RecipeForm`, `TagEditor`, `TimerDock`
 - `src/app/api/recipes/[id]`: PUT (full save), PATCH (favorite, notes), DELETE
 - `scripts/`: manual Gemini test script and a sample recipe
@@ -46,6 +51,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 `GEMINI_API_KEY`, `APP_PASSWORD`, `SESSION_SECRET`, optional `GEMINI_MODEL`.
 
 ## Not done yet
+- Check automatic ingredient conversions on real recipes (estimates); fix cook times of recipes saved before the cook-time rule (the granola has 95 min).
 - All three screens were rebuilt to follow the mockup on 2026-11-15; the owner reviews page by page for remaining differences. Login and the share page have had less attention.
 - Hebrew translation of the remaining English buttons and labels (waiting for the owner's decision).
 - The owner's pan-size conversion rules.

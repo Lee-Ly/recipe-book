@@ -1,32 +1,41 @@
-export interface CategoryDef {
+/**
+ * A category is the TYPE of food (cookies, cake, soup...). A tag is a keyword that describes one dish (spicy, 15 minutes...).
+ * The owner manages both on the "Categories & Tags" page; recipes store category ids and tag texts.
+ */
+export interface Category {
   id: string;
-  en: string;
-  he: string;
+  /** Name shown on the site (Hebrew by default) */
+  name: string;
+  /** Optional English name, used for recipes written in English */
+  en?: string;
+  /** Baking categories scale by pan size; the others scale by number of people */
+  baking?: boolean;
 }
 
-export const DEFAULT_CATEGORIES: CategoryDef[] = [
-  { id: "cookies", en: "Cookies", he: "עוגיות" },
-  { id: "cake", en: "Cake", he: "עוגות" },
-  { id: "bread", en: "Bread", he: "לחמים ומאפים" },
-  { id: "dairy", en: "Dairy", he: "חלבי" },
-  { id: "vegan", en: "Vegan", he: "טבעוני" },
-  { id: "dessert", en: "Dessert", he: "קינוחים" },
-  { id: "breakfast", en: "Breakfast", he: "ארוחת בוקר" },
-  { id: "snack", en: "Snack", he: "חטיפים" },
-  { id: "main", en: "Main dish", he: "מנות עיקריות" },
-  { id: "soup", en: "Soup", he: "מרקים" },
-  { id: "salad", en: "Salad", he: "סלטים" },
+/** Categories a new site starts with. */
+export const DEFAULT_CATEGORIES: Category[] = [
+  { id: "cookies", name: "עוגיות", en: "Cookies", baking: true },
+  { id: "cake", name: "עוגות", en: "Cake", baking: true },
+  { id: "bread", name: "לחמים ומאפים", en: "Bread", baking: true },
+  { id: "dairy", name: "חלבי", en: "Dairy" },
+  { id: "vegan", name: "טבעוני", en: "Vegan" },
+  { id: "dessert", name: "קינוחים", en: "Dessert", baking: true },
+  { id: "breakfast", name: "ארוחת בוקר", en: "Breakfast" },
+  { id: "snack", name: "חטיפים", en: "Snack" },
+  { id: "main", name: "מנות עיקריות", en: "Main dish" },
+  { id: "soup", name: "מרקים", en: "Soup" },
+  { id: "salad", name: "סלטים", en: "Salad" },
 ];
 
-/** Label for a category id in the recipe's language. Custom categories are shown as typed. */
-export function categoryLabel(id: string, language: string): string {
-  const def = DEFAULT_CATEGORIES.find((c) => c.id === id);
-  if (!def) return id;
-  return language === "he" ? def.he : def.en;
+export interface Taxonomy {
+  categories: Category[];
+  /** Every tag available on the site */
+  tags: string[];
 }
 
-/** Hebrew-only label used on the home filter chips. Custom categories are shown as typed. */
-export function categoryFilterLabel(id: string): string {
-  const def = DEFAULT_CATEGORIES.find((c) => c.id === id);
-  return def ? def.he : id;
+/** Name of a category for a recipe in `language`; unknown ids are shown as they are. */
+export function categoryName(categories: Category[], id: string, language: string): string {
+  const c = categories.find((x) => x.id === id);
+  if (!c) return id;
+  return language !== "he" && c.en ? c.en : c.name;
 }

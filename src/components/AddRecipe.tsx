@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import type { Category } from "@/lib/categories";
 import type { ExtractResult, RecipeDraft } from "@/lib/types";
 import BackButton from "./BackButton";
 import { LinkIcon } from "./icons";
@@ -36,7 +37,7 @@ async function requestExtract(url: string, text: string): Promise<ExtractResult>
 const darkField =
   "w-full rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-base text-background outline-none transition placeholder:text-muted-2 focus:border-accent";
 
-export default function AddRecipe({ initialUrl = "", initialText = "" }: { initialUrl?: string; initialText?: string }) {
+export default function AddRecipe({ initialUrl = "", initialText = "", categories, tagPool }: { initialUrl?: string; initialText?: string; categories: Category[]; tagPool: string[] }) {
   const autoStart = !!(initialUrl || initialText);
   const [url, setUrl] = useState(initialUrl);
   const [text, setText] = useState(initialText);
@@ -76,19 +77,6 @@ export default function AddRecipe({ initialUrl = "", initialText = "" }: { initi
     }
   }
 
-  async function paste() {
-    try {
-      const clip = (await navigator.clipboard.readText()).trim();
-      if (/^https?:\/\//i.test(clip)) setUrl(clip.split(/\s/)[0]);
-      else if (clip) {
-        setText(clip);
-        setShowText(true);
-      }
-    } catch {
-      setError("Couldn't read the clipboard. Paste into the field instead.");
-    }
-  }
-
   return (
     <>
       <SiteHeader
@@ -107,12 +95,8 @@ export default function AddRecipe({ initialUrl = "", initialText = "" }: { initi
             <LinkIcon className="h-4 w-4 text-accent" />
             <h2 className="text-sm font-bold">Import Recipe from Link</h2>
           </div>
-          <p className="text-xs leading-relaxed text-line-strong">Paste an Instagram, Facebook or recipe page link to extract the ingredients, categories and method steps.</p>
           <div className="flex items-center gap-2">
             <input id="url" dir="ltr" inputMode="url" autoComplete="off" aria-label="Recipe link" placeholder="https://..." value={url} onChange={(e) => setUrl(e.target.value)} className={`${darkField} min-w-0 flex-1`} />
-            <button type="button" onClick={paste} className="inline-flex shrink-0 items-center rounded-xl bg-white/10 px-3.5 py-2 text-xs font-bold transition hover:bg-white/20 active:bg-white/20">
-              Paste
-            </button>
             <button type="submit" disabled={busy || (!url.trim() && !text.trim())} className={btnPrimary}>
               {busy ? "Reading…" : result ? "Read again" : "Import"}
             </button>
@@ -140,6 +124,8 @@ export default function AddRecipe({ initialUrl = "", initialText = "" }: { initi
         <RecipeForm
           key={round}
           mode={{ kind: "create" }}
+          categories={categories}
+          tagPool={tagPool}
           initial={
             result
               ? { ...result.draft, sourceUrl: result.sourceUrl, remoteImageUrl: result.imageUrl ?? "", storedImage: null }

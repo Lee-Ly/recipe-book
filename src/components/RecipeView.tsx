@@ -3,7 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { categoryLabel } from "@/lib/categories";
+import { categoryName, type Category } from "@/lib/categories";
 import { formatAmount, formatDuration, LABELS, type UnitMode } from "@/lib/format";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
 import { isBaking, panFactor } from "@/lib/pan";
@@ -11,7 +11,7 @@ import { splitStepTimes } from "@/lib/steps";
 import { startTimer } from "@/lib/timer-store";
 import type { Pan, Recipe } from "@/lib/types";
 import { CheckIcon, TimerIcon } from "./icons";
-import { btnDark, btnGhost, btnText, categoryPill, cardCls, inputCls, panelCls, rowCls, sectionTitle, tagPill } from "./ui";
+import { btnDark, btnGhost, btnText, categoryPill, cardCls, fieldLabel, inputCls, panelCls, rowCls, sectionTitle, tagPill } from "./ui";
 
 const UNITS: UnitMode[] = ["cups", "grams", "ml"];
 
@@ -29,6 +29,15 @@ function parsePanDraft(d: PanDraft): Pan | null {
   if (!(a > 0)) return null;
   if (d.shape === "rect") return b > 0 ? { shape: "rect", a, b } : null;
   return { shape: d.shape, a, b: null };
+}
+
+/** The website name of a link, for recipes that have no author. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return "";
+  }
 }
 
 function Notes({ id, initial, he }: { id: string; initial: string; he: boolean }) {
@@ -105,11 +114,11 @@ function Notes({ id, initial, he }: { id: string; initial: string; he: boolean }
  * The recipe itself. Used by the owner (shareToken undefined) and by the public share page,
  * which gets read-only content without notes.
  */
-export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; shareToken?: string }) {
+export default function RecipeView({ recipe, categories, shareToken }: { recipe: Recipe; categories: Category[]; shareToken?: string }) {
   const he = recipe.language === "he";
   const labels = he ? LABELS.he : LABELS.en;
   const owner = !shareToken;
-  const baking = isBaking(recipe.categories);
+  const baking = isBaking(recipe.categories, categories);
   const [unit, setUnit] = useState<UnitMode>("grams");
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [current, setCurrent] = useState<number | null>(null);
@@ -130,9 +139,10 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
   const panChanged = !!recipe.pan && !!pan && JSON.stringify(pan) !== JSON.stringify(toPanDraft(recipe.pan));
 
   const imageSrc = recipe.image ? `/api/img/${recipe.image}${shareToken ? `?t=${shareToken}` : ""}` : null;
+  const byline = recipe.author || hostOf(recipe.sourceUrl);
   const facts = [
     recipe.ovenCelsius != null ? `${labels.oven} ${recipe.ovenCelsius}°C` : "",
-    recipe.totalMinutes ? formatDuration(recipe.totalMinutes, recipe.language) : "",
+    recipe.totalMinutes ? `${labels.time} ${formatDuration(recipe.totalMinutes, recipe.language)}` : "",
   ].filter(Boolean);
   const progress = he ? `${checked.size} מתוך ${recipe.ingredients.length} ${labels.prepped}` : `${checked.size} of ${recipe.ingredients.length} ${labels.prepped}`;
 
@@ -161,9 +171,14 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
 
       <div className="space-y-2.5">
         <h1 className="text-2xl font-bold leading-tight">{recipe.title}</h1>
-        {(recipe.author || facts.length > 0) && (
+        {byline && (
+          <p className="text-sm font-medium text-muted">
+            <bdi>{byline}</bdi>
+          </p>
+        )}
+        {facts.length > 0 && (
           <p className="text-sm text-muted">
-            {[recipe.author, ...facts].filter(Boolean).map((f, i) => (
+            {facts.map((f, i) => (
               <span key={f}>
                 {i > 0 && " · "}
                 <bdi>{f}</bdi>
@@ -171,24 +186,13 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
             ))}
           </p>
         )}
-        {(recipe.categories.length > 0 || recipe.tags.length > 0) && (
+        {recipe.categories.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {recipe.categories.map((c) => (
               <span key={c} className={categoryPill}>
-                {categoryLabel(c, recipe.language)}
+                {categoryName(categories, c, recipe.language)}
               </span>
             ))}
-            {recipe.tags.map((t) =>
-              owner ? (
-                <Link key={t} href={`/?q=${encodeURIComponent(t)}`} className={`${tagPill} transition hover:border-foreground active:border-foreground`}>
-                  {t}
-                </Link>
-              ) : (
-                <span key={t} className={tagPill}>
-                  {t}
-                </span>
-              ),
-            )}
           </div>
         )}
       </div>
@@ -269,9 +273,7 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
                     <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${on ? "border-foreground bg-foreground text-background" : "border-line-strong bg-card"}`}>
                       {on && <CheckIcon className="h-3.5 w-3.5" />}
                     </span>
-                    {amount && (
-                      <bdi className="min-w-[68px] text-xs font-bold tabular-nums text-accent">{amount}</bdi>
-                    )}
+                    {amount && <bdi className="min-w-[68px] text-xs font-bold tabular-nums text-accent">{amount}</bdi>}
                     <span className={`text-sm font-medium ${on ? "text-muted line-through" : ""}`}>{ing.name}</span>
                   </button>
                 </li>
@@ -304,7 +306,7 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
                   className={`cursor-pointer p-4 ${cardCls} ${active ? "border-foreground shadow-sm ring-2 ring-foreground/10" : "hover:border-line-strong active:border-line-strong"}`}
                 >
                   <div className="mb-2 flex items-center justify-between">
-                    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold text-white ${active ? "bg-accent" : "bg-foreground text-background"}`}>{i + 1}</span>
+                    <span className={`inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs font-bold ${active ? "bg-accent text-white" : "bg-foreground text-background"}`}>{i + 1}</span>
                     <span className={`text-[10px] font-bold uppercase tracking-wider ${active ? "text-accent" : "text-muted-2"}`}>{he ? (active ? "שלב נוכחי" : `שלב ${i + 1}`) : active ? "Active Step" : `Step ${i + 1}`}</span>
                   </div>
                   <p className="text-sm leading-relaxed">
@@ -336,12 +338,29 @@ export default function RecipeView({ recipe, shareToken }: { recipe: Recipe; sha
 
       {owner && <Notes id={recipe.id} initial={recipe.notes} he={he} />}
 
+      {recipe.tags.length > 0 && (
+        <section>
+          <h2 className={fieldLabel}>{labels.tags}</h2>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {recipe.tags.map((t) =>
+              owner ? (
+                <Link key={t} href={`/?q=${encodeURIComponent(t)}`} className={`${tagPill} transition hover:border-foreground active:border-foreground`}>
+                  {t}
+                </Link>
+              ) : (
+                <span key={t} className={tagPill}>
+                  {t}
+                </span>
+              ),
+            )}
+          </div>
+        </section>
+      )}
+
       {recipe.sourceUrl && (
-        <p dir="ltr" className="truncate text-xs text-muted">
-          <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" className="underline">
-            {labels.source}
-          </a>
-        </p>
+        <a href={recipe.sourceUrl} target="_blank" rel="noopener noreferrer" dir="ltr" className="block truncate text-xs text-muted underline">
+          {recipe.sourceUrl}
+        </a>
       )}
     </article>
   );

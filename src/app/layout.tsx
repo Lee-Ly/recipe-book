@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import Link from "next/link";
 import { DM_Sans, Open_Sans } from "next/font/google";
 import LogoutButton from "@/components/LogoutButton";
 import TimerDock from "@/components/TimerDock";
@@ -37,7 +38,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-8">{children}</main>
         {authed && (
           <footer className="border-t border-line">
-            <div className="mx-auto flex max-w-5xl justify-center px-5 py-3">
+            <div className="mx-auto flex max-w-5xl items-center justify-center gap-6 px-5 py-3">
+              <Link href="/manage" className="py-1 text-xs font-semibold text-muted transition hover:text-foreground active:text-foreground">
+                Categories &amp; Tags
+              </Link>
               <LogoutButton />
             </div>
           </footer>

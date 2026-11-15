@@ -1,5 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { DEFAULT_CATEGORIES, type Category, type Taxonomy } from "./categories";
 import type { Recipe } from "./types";
 
 // Local JSON storage. Everything goes through this file so it can be swapped
@@ -7,6 +8,7 @@ import type { Recipe } from "./types";
 const DATA_DIR = path.join(process.cwd(), "data");
 const RECIPES_FILE = path.join(DATA_DIR, "recipes.json");
 const IMAGE_DIR = path.join(DATA_DIR, "images");
+const TAXONOMY_FILE = path.join(DATA_DIR, "taxonomy.json");
 
 const IMAGE_TYPES: Record<string, string> = {
   jpg: "image/jpeg",
@@ -104,4 +106,94 @@ export async function readImage(name: string): Promise<{ data: Buffer; contentTy
   } catch {
     return null;
   }
+}
+
+// ---------- categories and tags ----------
+
+async function readTaxonomyFile(): Promise<Partial<Taxonomy> | null> {
+  try {
+    return JSON.parse(await fs.readFile(TAXONOMY_FILE, "utf8")) as Partial<Taxonomy>;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
+  }
+}
+
+/** All categories (the owner's list, or the defaults) and every tag in use or added by hand. */
+export async function getTaxonomy(): Promise<Taxonomy> {
+  const file = await readTaxonomyFile();
+  const recipes = await readAll();
+  const categories: Category[] = file?.categories ?? DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+  // Categories typed by hand before the management page existed show up as their own entries.
+  for (const r of recipes) for (const id of r.categories) if (!categories.some((c) => c.id === id)) categories.push({ id, name: id });
+  const tags = new Set([...(file?.tags ?? []), ...recipes.flatMap((r) => r.tags)]);
+  return { categories, tags: [...tags].sort((a, b) => a.localeCompare(b)) };
+}
+
+export type TaxonomyChange =
+  | { op: "addCategory"; name: string; baking?: boolean }
+  | { op: "renameCategory"; id: string; name: string }
+  | { op: "setBaking"; id: string; baking: boolean }
+  | { op: "deleteCategory"; id: string }
+  | { op: "addTag"; name: string }
+  | { op: "renameTag"; from: string; to: string }
+  | { op: "deleteTag"; name: string };
+
+/** Applies one change to the category/tag lists, and to every recipe that uses the renamed or removed item. */
+export function changeTaxonomy(change: TaxonomyChange): Promise<Taxonomy> {
+  return serialize(async () => {
+    const tax = await getTaxonomy();
+    const recipes = await readAll();
+    let recipesChanged = false;
+    const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+    if (change.op === "addCategory") {
+      const name = change.name.trim();
+      if (name && !tax.categories.some((c) => same(c.name, name))) tax.categories.push({ id: `c${Date.now().toString(36)}`, name, baking: change.baking === true });
+    } else if (change.op === "renameCategory") {
+      const name = change.name.trim();
+      const c = tax.categories.find((x) => x.id === change.id);
+      if (c && name) c.name = name;
+    } else if (change.op === "setBaking") {
+      const c = tax.categories.find((x) => x.id === change.id);
+      if (c) c.baking = change.baking;
+    } else if (change.op === "deleteCategory") {
+      tax.categories = tax.categories.filter((c) => c.id !== change.id);
+      for (const r of recipes) {
+        if (r.categories.includes(change.id)) {
+          r.categories = r.categories.filter((id) => id !== change.id);
+          recipesChanged = true;
+        }
+      }
+    } else if (change.op === "addTag") {
+      const name = change.name.trim().replace(/^#/, "");
+      if (name && !tax.tags.some((t) => same(t, name))) tax.tags.push(name);
+    } else if (change.op === "renameTag") {
+      const to = change.to.trim().replace(/^#/, "");
+      if (to) {
+        tax.tags = [...new Set(tax.tags.map((t) => (t === change.from ? to : t)))];
+        for (const r of recipes) {
+          if (r.tags.includes(change.from)) {
+            r.tags = [...new Set(r.tags.map((t) => (t === change.from ? to : t)))];
+            recipesChanged = true;
+          }
+        }
+      }
+    } else if (change.op === "deleteTag") {
+      tax.tags = tax.tags.filter((t) => t !== change.name);
+      for (const r of recipes) {
+        if (r.tags.includes(change.name)) {
+          r.tags = r.tags.filter((t) => t !== change.name);
+          recipesChanged = true;
+        }
+      }
+    }
+
+    await fs.mkdir(DATA_DIR, { recursive: true });
+    const tmp = `${TAXONOMY_FILE}.tmp`;
+    await fs.writeFile(tmp, JSON.stringify(tax, null, 2), "utf8");
+    await fs.rename(tmp, TAXONOMY_FILE);
+    if (recipesChanged) await writeAll(recipes);
+    return tax;
+  });
 }

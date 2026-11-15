@@ -79,6 +79,11 @@ export const PencilIcon = (p: P) => (
     <path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
   </Icon>
 );
+export const MenuIcon = (p: P) => (
+  <Icon {...p}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </Icon>
+);
 export const CheckIcon = (p: P) => (
   <Icon {...p}>
     <path d="M20 6 9 17l-5-5" />

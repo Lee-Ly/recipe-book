@@ -3,11 +3,12 @@ import Header from "@/components/Header";
 import RecipeBrowser, { type CardData } from "@/components/RecipeBrowser";
 import { btnPrimary } from "@/components/ui";
 import { requireAuth } from "@/lib/auth";
-import { listRecipes } from "@/lib/store";
+import { getTaxonomy, listRecipes } from "@/lib/store";
 
 export default async function HomePage({ searchParams }: PageProps<"/">) {
   await requireAuth();
   const recipes = await listRecipes();
+  const taxonomy = await getTaxonomy();
   const q = (await searchParams).q;
 
   const cards: CardData[] = recipes.map((r) => ({
@@ -35,7 +36,7 @@ export default async function HomePage({ searchParams }: PageProps<"/">) {
           </Link>
         </div>
       ) : (
-        <RecipeBrowser recipes={cards} initialQuery={typeof q === "string" ? q : ""} />
+        <RecipeBrowser recipes={cards} categories={taxonomy.categories} initialQuery={typeof q === "string" ? q : ""} />
       )}
     </>
   );

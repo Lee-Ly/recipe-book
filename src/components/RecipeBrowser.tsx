@@ -3,9 +3,9 @@
 /* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { useMemo, useState, useSyncExternalStore } from "react";
-import { categoryFilterLabel, categoryLabel } from "@/lib/categories";
+import { categoryName, type Category } from "@/lib/categories";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
-import { ArrowLeftIcon, ArrowRightIcon, HeartIcon, SearchIcon } from "./icons";
+import { ArrowLeftIcon, ArrowRightIcon, HeartIcon, MenuIcon, SearchIcon, XIcon } from "./icons";
 import { btnDark, btnGhost, btnPrimary, cardCls, categoryBadge, filterChip, searchCls, tagBadge } from "./ui";
 
 export interface CardData {
@@ -25,12 +25,6 @@ const FIRST_PAGE = 6;
 const NEXT_PAGES = 10;
 const FAVORITES = "__favorites";
 
-function countBy(items: string[]): [string, number][] {
-  const counts = new Map<string, number>();
-  for (const item of items) counts.set(item, (counts.get(item) ?? 0) + 1);
-  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-}
-
 function subscribeStorage(cb: () => void) {
   window.addEventListener("storage", cb);
   return () => window.removeEventListener("storage", cb);
@@ -48,31 +42,39 @@ function countLabel(n: number): string {
   return n === 1 ? "מתכון אחד" : `${n} מתכונים`;
 }
 
-export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes: CardData[]; initialQuery?: string }) {
+export default function RecipeBrowser({ recipes, categories, initialQuery = "" }: { recipes: CardData[]; categories: Category[]; initialQuery?: string }) {
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [favs, setFavs] = useState<Record<string, boolean>>(() => Object.fromEntries(recipes.map((r) => [r.id, r.favorite])));
   const lastId = useSyncExternalStore(subscribeStorage, readLastViewed, () => null);
 
-  const categories = useMemo(() => countBy(recipes.flatMap((r) => r.categories)), [recipes]);
+  const counts = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of recipes) for (const id of r.categories) m.set(id, (m.get(id) ?? 0) + 1);
+    return m;
+  }, [recipes]);
+  const usedCategories = categories.filter((c) => counts.has(c.id));
   const hasFavorites = recipes.some((r) => favs[r.id]);
+  const nameOf = (id: string) => categoryName(categories, id, "he");
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase().replace(/^#/, "");
     return recipes.filter((r) => {
       if (filter === FAVORITES ? !favs[r.id] : filter && !r.categories.includes(filter)) return false;
       if (!q) return true;
-      return [r.title, ...r.tags, ...r.categories, ...r.ingredients].some((s) => s.toLowerCase().includes(q));
+      return [r.title, ...r.tags, ...r.categories.map(nameOf), ...r.ingredients].some((s) => s.toLowerCase().includes(q));
     });
-  }, [recipes, query, filter, favs]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipes, query, filter, favs, categories]);
 
   const totalPages = visible.length <= FIRST_PAGE ? 1 : 1 + Math.ceil((visible.length - FIRST_PAGE) / NEXT_PAGES);
   const current = Math.min(page, totalPages);
   const start = current === 1 ? 0 : FIRST_PAGE + (current - 2) * NEXT_PAGES;
   const shown = visible.slice(start, current === 1 ? FIRST_PAGE : start + NEXT_PAGES);
   const resume = !query && !filter ? recipes.find((r) => r.id === lastId) : undefined;
-  const heading = filter === FAVORITES ? "מועדפים" : filter ? categoryFilterLabel(filter) : "כל המתכונים";
+  const heading = filter === FAVORITES ? "מועדפים" : filter ? nameOf(filter) : "כל המתכונים";
 
   function changeQuery(v: string) {
     setQuery(v);
@@ -102,9 +104,15 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
 
   return (
     <div className="space-y-5 pt-4">
-      <div className="relative">
-        <SearchIcon className="pointer-events-none absolute start-3.5 top-3.5 h-4 w-4 text-muted-2" />
-        <input type="search" dir="rtl" value={query} onChange={(e) => changeQuery(e.target.value)} placeholder="חפש מתכון" aria-label="חפש מתכון" className={searchCls} />
+      <div className="flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <SearchIcon className="pointer-events-none absolute start-3.5 top-3.5 h-4 w-4 text-muted-2" />
+          <input type="search" dir="rtl" value={query} onChange={(e) => changeQuery(e.target.value)} placeholder="חפש מתכון" aria-label="חפש מתכון" className={searchCls} />
+        </div>
+        <button type="button" onClick={() => setMenuOpen(true)} className={`${btnGhost} h-[46px] px-3`} aria-haspopup="dialog">
+          <MenuIcon className="h-4 w-4" />
+          <span>קטגוריות</span>
+        </button>
       </div>
 
       <div className="no-scrollbar -mx-5 flex items-center gap-2 overflow-x-auto px-5 pb-0.5" role="group" aria-label="Categories">
@@ -116,9 +124,9 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
             ♥ מועדפים
           </button>
         )}
-        {categories.map(([id]) => (
-          <button key={id} type="button" onClick={() => changeFilter(filter === id ? null : id)} aria-pressed={filter === id} className={filterChip(filter === id)}>
-            {categoryFilterLabel(id)}
+        {usedCategories.map((c) => (
+          <button key={c.id} type="button" onClick={() => changeFilter(filter === c.id ? null : c.id)} aria-pressed={filter === c.id} className={filterChip(filter === c.id)}>
+            {c.name}
           </button>
         ))}
       </div>
@@ -187,7 +195,7 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
                     </p>
                   )}
                   <p dir={r.language === "he" ? "rtl" : "ltr"} className="mt-2 flex flex-wrap gap-1">
-                    {r.categories[0] && <span className={categoryBadge}>{categoryLabel(r.categories[0], r.language)}</span>}
+                    {r.categories[0] && <span className={categoryBadge}>{categoryName(categories, r.categories[0], r.language)}</span>}
                     {r.tags.slice(0, 3).map((t) => (
                       <span key={t} className={tagBadge}>
                         {t}
@@ -226,6 +234,39 @@ export default function RecipeBrowser({ recipes, initialQuery = "" }: { recipes:
             </nav>
           )}
         </>
+      )}
+
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 bg-black/40" onClick={() => setMenuOpen(false)}>
+          <div role="dialog" aria-modal="true" aria-label="קטגוריות" className="absolute inset-x-0 bottom-0 mx-auto max-h-[75vh] max-w-2xl overflow-y-auto rounded-t-3xl bg-background p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-base font-bold">קטגוריות</h2>
+              <button type="button" aria-label="Close" onClick={() => setMenuOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-xl text-muted transition hover:bg-accent-soft active:bg-accent-soft">
+                <XIcon />
+              </button>
+            </div>
+            <ul className="space-y-1.5">
+              {[{ id: null as string | null, name: "כל המתכונים", count: recipes.length }, ...categories.map((c) => ({ id: c.id as string | null, name: c.name, count: counts.get(c.id) ?? 0 }))].map((row) => (
+                <li key={row.id ?? "all"}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      changeFilter(row.id);
+                      setMenuOpen(false);
+                    }}
+                    className={`flex w-full items-center justify-between rounded-xl border px-3.5 py-2.5 text-start text-sm font-semibold transition ${filter === row.id ? "border-foreground bg-foreground text-background" : "border-line bg-card hover:border-foreground active:border-foreground"}`}
+                  >
+                    <span>{row.name}</span>
+                    <span className={`text-xs tabular-nums ${filter === row.id ? "opacity-70" : "text-muted"}`}>{row.count}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <Link href="/manage" className="mt-4 block text-center text-xs font-bold text-accent hover:underline">
+              ניהול קטגוריות ותגיות
+            </Link>
+          </div>
+        </div>
       )}
     </div>
   );
