@@ -4,6 +4,9 @@ import { readRecipeForm, storeImageFor } from "@/lib/recipe-input";
 import { upsertRecipe } from "@/lib/store";
 import type { Recipe } from "@/lib/types";
 
+/** Allow up to 60 seconds: reading a recipe or converting amounts calls the AI. */
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   if (!(await isAuthed())) return unauthorized();
   try {

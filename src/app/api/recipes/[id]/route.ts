@@ -4,6 +4,9 @@ import { deleteRecipe, getRecipe, removeImage, upsertRecipe } from "@/lib/store"
 
 type Ctx = { params: Promise<{ id: string }> };
 
+/** Allow up to 60 seconds: reading a recipe or converting amounts calls the AI. */
+export const maxDuration = 60;
+
 export async function PUT(req: Request, { params }: Ctx) {
   if (!(await isAuthed())) return unauthorized();
   const { id } = await params;

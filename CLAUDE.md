@@ -41,7 +41,7 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 ## Layout
 - `src/lib/extract.ts`: link fetch, page parsing, Gemini, fallback parser, author guess
 - `src/lib/gemini.ts`: Gemini call, prompt and `normalizeDraft` (model via `GEMINI_MODEL`, falls back to `gemini-flash-latest`)
-- `src/lib/store.ts`: **all** storage (currently `data/recipes.json` + `data/images/`). Swap this one file to move to a hosted database. Old records get defaults for new fields when read.
+- `src/lib/store.ts`: **all** storage. Uses Supabase (`store-supabase.ts`: tables `recipes` and `site_settings`, private bucket `recipe-images`, schema in `supabase/schema.sql`) when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set, otherwise local files in `data/` (`store-local.ts`). Both implement `store-backend.ts`. Old records get defaults for new fields when read.
 - `src/lib/convert.ts` (unit conversion on save), `categories.ts` (category/tag types), `units.ts`, `steps.ts` (time detection), `pan.ts` (baking), `format.ts` (amounts and Hebrew/English labels), `timer-store.ts` (timers, chime, wake lock), `categories.ts`
 - `src/app/manage/` + `ManageTaxonomy.tsx` (Categories & Tags page), `src/app/api/taxonomy`, `ConfirmDialog.tsx`
 - `src/components/`: `ui.ts` (shared styles), `SiteHeader`, `Header` (home), `BackButton`, `RecipeBar` (recipe header), `RecipeBrowser` (home), `RecipeView`, `RecipeForm`, `TagEditor`, `TimerDock`
@@ -49,12 +49,13 @@ Next.js 16 (App Router) + React 19 + TypeScript + Tailwind CSS 4. This Next.js v
 - `scripts/`: manual Gemini test script and a sample recipe
 
 ## Env (`.env.local`, never committed)
-`GEMINI_API_KEY`, `APP_PASSWORD`, `SESSION_SECRET`, optional `GEMINI_MODEL`.
+`GEMINI_API_KEY`, `APP_PASSWORD`, `SESSION_SECRET`, `SUPABASE_URL` (the `https://<project>.supabase.co` address, NOT the dashboard link), `SUPABASE_SERVICE_ROLE_KEY` (the secret key, server only), optional `GEMINI_MODEL`. `.env.vercel` (git-ignored) holds the production values to import in Vercel; the production site password differs from the local one.
 
 ## Not done yet
 - Check automatic ingredient conversions on real recipes (estimates); fix cook times of recipes saved before the cook-time rule (the granola has 95 min).
 - All three screens were rebuilt to follow the mockup on 2026-11-15; the owner reviews page by page for remaining differences. Login and the share page have had less attention.
 - Hebrew translation of the remaining English buttons and labels (waiting for the owner's decision).
 - The owner's pan-size conversion rules.
-- Hosted database and image storage (Supabase), deployment (Vercel), image resizing, a login rate limiter. The local `data/` folder only works on one machine. Android share-into-app and install need the site online over HTTPS.
+- Deployment on Vercel (code is at github.com/Lee-Ly/recipe-book, private; Supabase holds the data; `vercel.json` pins Frankfurt). Image resizing is still missing: Vercel rejects uploads over about 4.5 MB (photos downloaded from a link are fine). A login rate limiter is missing. Android share-into-app and install need the online HTTPS site.
+- `scripts/migrate-to-supabase.mjs` copied the local data/ folder to Supabase once; `data/` is now only a backup.
 - Temporary Windows firewall rule "Recipe Book dev (3000)" can be removed when no longer needed.
