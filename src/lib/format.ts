@@ -67,7 +67,7 @@ export function formatDuration(minutes: number, language: string): string {
 export const LABELS = {
   he: {
     ingredients: "מצרכים", steps: "אופן ההכנה", oven: "תנור", time: "זמן אפייה/בישול", source: "מקור", estimate: "כ־ = המרה משוערת",
-    units: { cups: "כוסות", grams: "גרם", ml: "מ״ל" }, serves: "מספר סועדים", pan: "תבנית", notes: "הערות", addNote: "הוספת הערה",
+    units: { cups: "כוסות", grams: "גרם", ml: "מ״ל" }, serves: "מספר מנות/יחידות", pan: "תבנית", notes: "הערות", addNote: "הוספת הערה",
     tags: "תגיות", edit: "עריכה", save: "שמירה", cancel: "ביטול", setPan: "הגדרת גודל תבנית מקורי", setServings: "הגדרת מספר סועדים", bakingIn: "אופים בתבנית", reset: "איפוס",
     round: "עגולה", square: "מרובעת", rect: "מלבנית", prepped: "הוכנו",
   },

@@ -208,7 +208,7 @@ export default function RecipeForm({
       const res = await fetch(editing ? `/api/recipes/${mode.id}` : "/api/recipes", { method: editing ? "PUT" : "POST", body });
       const json = (await res.json()) as { id?: string; error?: string; imageWarning?: string | null };
       if (!res.ok || !json.id) throw new Error(json.error ?? "Couldn't save the recipe.");
-      router.push(`/recipes/${json.id}`);
+      router.push("/"); // back to the home page after saving
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Couldn't save the recipe.");

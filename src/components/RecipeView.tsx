@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { categoryName, type Category } from "@/lib/categories";
 import { formatAmount, formatDuration, LABELS, type UnitMode } from "@/lib/format";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
-import { isBaking, panFactor } from "@/lib/pan";
+import { isBaking } from "@/lib/pan";
 import { splitStepTimes } from "@/lib/steps";
 import { startTimer } from "@/lib/timer-store";
 import type { Pan, Recipe } from "@/lib/types";
@@ -14,22 +14,6 @@ import { CheckIcon, TimerIcon } from "./icons";
 import { btnDark, btnGhost, btnText, categoryPill, cardCls, fieldLabel, inputCls, panelCls, rowCls, sectionTitle, tagPill } from "./ui";
 
 const UNITS: UnitMode[] = ["cups", "grams", "ml"];
-
-interface PanDraft {
-  shape: Pan["shape"];
-  a: string;
-  b: string;
-}
-
-const toPanDraft = (p: Pan): PanDraft => ({ shape: p.shape, a: String(p.a), b: String(p.b ?? p.a) });
-
-function parsePanDraft(d: PanDraft): Pan | null {
-  const a = parseFloat(d.a);
-  const b = parseFloat(d.b);
-  if (!(a > 0)) return null;
-  if (d.shape === "rect") return b > 0 ? { shape: "rect", a, b } : null;
-  return { shape: d.shape, a, b: null };
-}
 
 /** "עגולה 20 ס״מ", "Round 20 cm", "20 × 30 cm". */
 function panText(pan: Pan, he: boolean): string {
@@ -130,7 +114,6 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
   const [unit, setUnit] = useState<UnitMode>("grams");
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [current, setCurrent] = useState<number | null>(null);
-  const [pan, setPan] = useState<PanDraft | null>(recipe.pan ? toPanDraft(recipe.pan) : null);
   const [people, setPeople] = useState(recipe.servings ?? 0);
 
   useEffect(() => {
@@ -142,9 +125,8 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
     }
   }, [owner, recipe.id]);
 
-  const panParsed = pan ? parsePanDraft(pan) : null;
-  const factor = baking ? (recipe.pan && panParsed ? panFactor(recipe.pan, panParsed) : 1) : recipe.servings ? people / recipe.servings : 1;
-  const panChanged = !!recipe.pan && !!pan && JSON.stringify(pan) !== JSON.stringify(toPanDraft(recipe.pan));
+  // Cooking recipes scale by the number of people. The pan size is shown in the details tiles only.
+  const factor = !baking && recipe.servings ? people / recipe.servings : 1;
 
   const imageSrc = recipe.image ? `/api/img/${recipe.image}${shareToken ? `?t=${shareToken}` : ""}` : null;
   const byline = recipe.author || hostOf(recipe.sourceUrl);
@@ -239,30 +221,6 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
               ) : null}
             </div>
           </div>
-
-          {baking && recipe.pan && pan && (
-            <div dir="ltr" className={`flex flex-wrap items-center gap-2 p-2 ${rowCls}`}>
-              <span className="px-1 text-[11px] font-bold text-muted">{he ? "Baking in" : labels.bakingIn}</span>
-              <select aria-label="Pan shape" value={pan.shape} onChange={(e) => setPan({ ...pan, shape: e.target.value as Pan["shape"] })} className="rounded-lg bg-accent-soft px-2 py-1.5 text-base font-bold text-ink-2 outline-none">
-                <option value="round">{LABELS.en.round}</option>
-                <option value="square">{LABELS.en.square}</option>
-                <option value="rect">{LABELS.en.rect}</option>
-              </select>
-              <input aria-label="Pan size in cm" inputMode="decimal" type="number" min="1" step="any" value={pan.a} onChange={(e) => setPan({ ...pan, a: e.target.value })} className="w-16 rounded-lg bg-accent-soft px-2 py-1.5 text-center text-base font-bold tabular-nums outline-none" />
-              {pan.shape === "rect" && (
-                <>
-                  <span className="text-muted">×</span>
-                  <input aria-label="Pan width in cm" inputMode="decimal" type="number" min="1" step="any" value={pan.b} onChange={(e) => setPan({ ...pan, b: e.target.value })} className="w-16 rounded-lg bg-accent-soft px-2 py-1.5 text-center text-base font-bold tabular-nums outline-none" />
-                </>
-              )}
-              <span className="text-[11px] font-bold text-muted">cm</span>
-              {panChanged && (
-                <button type="button" onClick={() => setPan(toPanDraft(recipe.pan!))} className={`${btnText} ms-auto`}>
-                  {labels.reset}
-                </button>
-              )}
-            </div>
-          )}
 
           <ul className="space-y-2">
             {recipe.ingredients.map((ing, i) => {
