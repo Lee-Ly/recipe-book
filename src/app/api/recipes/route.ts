@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       image: image.name,
       shareToken: null,
       favorite: false,
-      notes: "",
+      notes: input.notes ?? "",
       createdAt: new Date().toISOString(),
     };
     await upsertRecipe(recipe);

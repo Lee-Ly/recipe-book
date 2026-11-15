@@ -9,13 +9,10 @@ export async function POST(req: Request) {
   let change: TaxonomyChange | null = null;
   switch (body?.op) {
     case "addCategory":
-      change = { op: "addCategory", name: s(body.name), baking: body.baking === true };
+      change = { op: "addCategory", name: s(body.name) };
       break;
     case "renameCategory":
       change = { op: "renameCategory", id: s(body.id), name: s(body.name) };
-      break;
-    case "setBaking":
-      change = { op: "setBaking", id: s(body.id), baking: body.baking === true };
       break;
     case "deleteCategory":
       change = { op: "deleteCategory", id: s(body.id) };

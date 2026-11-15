@@ -18,6 +18,8 @@ export interface FormInitial extends RecipeDraft {
   remoteImageUrl: string;
   /** Photo already stored for this recipe (edit) */
   storedImage: string | null;
+  /** The owner's private notes */
+  notes: string;
 }
 
 type Mode = { kind: "create" } | { kind: "edit"; id: string };
@@ -103,6 +105,7 @@ export default function RecipeForm({
   const [rows, setRows] = useState<IngredientRow[]>(initial.ingredients.length ? initial.ingredients.map(toRow) : [emptyRow()]);
   const [steps, setSteps] = useState<string[]>(initial.steps.length ? initial.steps : [""]);
   const [author, setAuthor] = useState(initial.author);
+  const [notes, setNotes] = useState(initial.notes);
   const [oven, setOven] = useState(initial.ovenCelsius?.toString() ?? "");
   const [minutes, setMinutes] = useState(initial.totalMinutes?.toString() ?? "");
   const [servings, setServings] = useState(initial.servings?.toString() ?? "");
@@ -185,6 +188,7 @@ export default function RecipeForm({
       title: title.trim(),
       language,
       author: author.trim(),
+      notes: notes.trim(),
       ingredients,
       steps: cleanSteps,
       ovenCelsius: toNumber(oven),
@@ -440,6 +444,12 @@ export default function RecipeForm({
           <PlusIcon className="h-3.5 w-3.5 text-accent" />
           <span>Add Step</span>
         </button>
+      </div>
+
+      {/* Notes */}
+      <div className={`${panelCls} space-y-3 p-4`}>
+        <h2 className="text-sm font-bold">Notes</h2>
+        <textarea aria-label="Notes" dir="auto" rows={4} placeholder="Your own notes about this recipe..." value={notes} onChange={(e) => setNotes(e.target.value)} className="w-full rounded-lg border border-line bg-card p-2.5 text-base leading-relaxed outline-none transition focus:border-foreground" />
       </div>
     </form>
   );

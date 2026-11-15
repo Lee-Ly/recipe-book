@@ -31,6 +31,14 @@ function parsePanDraft(d: PanDraft): Pan | null {
   return { shape: d.shape, a, b: null };
 }
 
+/** "עגולה 20 ס״מ", "Round 20 cm", "20 × 30 cm". */
+function panText(pan: Pan, he: boolean): string {
+  const unit = he ? "ס״מ" : "cm";
+  if (pan.shape === "rect") return `${pan.a} × ${pan.b ?? pan.a} ${unit}`;
+  const shape = he ? (pan.shape === "round" ? LABELS.he.round : LABELS.he.square) : pan.shape === "round" ? LABELS.en.round : LABELS.en.square;
+  return `${shape} ${pan.a} ${unit}`;
+}
+
 /** The website name of a link, for recipes that have no author. */
 function hostOf(url: string): string {
   try {
@@ -140,10 +148,13 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
 
   const imageSrc = recipe.image ? `/api/img/${recipe.image}${shareToken ? `?t=${shareToken}` : ""}` : null;
   const byline = recipe.author || hostOf(recipe.sourceUrl);
-  const facts = [
-    recipe.ovenCelsius != null ? `${labels.oven} ${recipe.ovenCelsius}°C` : "",
-    recipe.totalMinutes ? `${labels.time} ${formatDuration(recipe.totalMinutes, recipe.language)}` : "",
-  ].filter(Boolean);
+  // The recipe's details, shown as small tiles under the categories. Only the ones that are filled in.
+  const details = [
+    recipe.ovenCelsius != null ? { label: labels.oven, value: `${recipe.ovenCelsius}°C` } : null,
+    recipe.totalMinutes ? { label: labels.time, value: formatDuration(recipe.totalMinutes, recipe.language) } : null,
+    recipe.servings ? { label: labels.serves, value: String(recipe.servings) } : null,
+    recipe.pan ? { label: labels.pan, value: panText(recipe.pan, he) } : null,
+  ].filter((d): d is { label: string; value: string } => d !== null);
   const progress = he ? `${checked.size} מתוך ${recipe.ingredients.length} ${labels.prepped}` : `${checked.size} of ${recipe.ingredients.length} ${labels.prepped}`;
 
   function toggle(i: number) {
@@ -154,12 +165,6 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
       return next;
     });
   }
-
-  const missingLink = owner && (baking ? !recipe.pan : !recipe.servings) && (
-    <Link href={`/recipes/${recipe.id}/edit`} className={btnText}>
-      {baking ? labels.setPan : labels.setServings}
-    </Link>
-  );
 
   return (
     <article dir={he ? "rtl" : "ltr"} className="mx-auto max-w-2xl space-y-6 pt-4">
@@ -176,16 +181,6 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
             <bdi>{byline}</bdi>
           </p>
         )}
-        {facts.length > 0 && (
-          <p className="text-sm text-muted">
-            {facts.map((f, i) => (
-              <span key={f}>
-                {i > 0 && " · "}
-                <bdi>{f}</bdi>
-              </span>
-            ))}
-          </p>
-        )}
         {recipe.categories.length > 0 && (
           <div className="flex flex-wrap items-center gap-1.5">
             {recipe.categories.map((c) => (
@@ -196,6 +191,19 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
           </div>
         )}
       </div>
+
+      {details.length > 0 && (
+        <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          {details.map((d) => (
+            <div key={d.label} className="rounded-xl border border-line bg-accent-soft px-3 py-2">
+              <dt className="text-[10px] font-bold uppercase tracking-wider text-muted">{d.label}</dt>
+              <dd className="mt-0.5 text-sm font-bold">
+                <bdi>{d.value}</bdi>
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
 
       {recipe.ingredients.length > 0 && (
         <section className={`${panelCls} space-y-3.5 p-4`}>
@@ -255,7 +263,6 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
               )}
             </div>
           )}
-          {missingLink}
 
           <ul className="space-y-2">
             {recipe.ingredients.map((ing, i) => {

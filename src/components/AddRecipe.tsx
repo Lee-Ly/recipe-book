@@ -128,8 +128,8 @@ export default function AddRecipe({ initialUrl = "", initialText = "", categorie
           tagPool={tagPool}
           initial={
             result
-              ? { ...result.draft, sourceUrl: result.sourceUrl, remoteImageUrl: result.imageUrl ?? "", storedImage: null }
-              : { ...EMPTY_DRAFT, sourceUrl: "", remoteImageUrl: "", storedImage: null }
+              ? { ...result.draft, sourceUrl: result.sourceUrl, remoteImageUrl: result.imageUrl ?? "", storedImage: null, notes: "" }
+              : { ...EMPTY_DRAFT, sourceUrl: "", remoteImageUrl: "", storedImage: null, notes: "" }
           }
         />
       </div>

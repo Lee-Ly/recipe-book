@@ -13,6 +13,8 @@ export interface RecipeForm {
   imageUrl: string;
   removeImage: boolean;
   file: File | null;
+  /** null when the form did not send notes */
+  notes: string | null;
 }
 
 /**
@@ -58,6 +60,7 @@ export async function readRecipeForm(req: Request): Promise<RecipeForm> {
     sourceUrl: typeof parsed.sourceUrl === "string" ? parsed.sourceUrl : "",
     imageUrl: typeof parsed.imageUrl === "string" ? parsed.imageUrl : "",
     removeImage: parsed.removeImage === true,
+    notes: typeof parsed.notes === "string" ? parsed.notes.slice(0, 5000) : null,
     file: file instanceof File && file.size > 0 ? file : null,
   };
 }

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import type { Category, Taxonomy } from "@/lib/categories";
+import type { Taxonomy } from "@/lib/categories";
 import ConfirmDialog from "./ConfirmDialog";
 import { PlusIcon, TrashIcon } from "./icons";
 import { btnDark, inputCls, panelCls, rowCls } from "./ui";
@@ -10,6 +10,7 @@ import { btnDark, inputCls, panelCls, rowCls } from "./ui";
 type Pending = { kind: "category"; id: string; name: string; count: number } | { kind: "tag"; name: string; count: number };
 
 const nameField = "min-w-0 flex-1 rounded-lg bg-transparent px-1.5 py-1.5 text-sm font-medium text-foreground outline-none transition focus:bg-accent-soft";
+const countBadge = "min-w-7 rounded-md bg-accent-soft px-2 py-0.5 text-center text-[11px] font-bold tabular-nums text-muted";
 const trashBtn = "p-1 text-muted-2 transition hover:text-rose-600 active:text-rose-600";
 
 /** Add, rename and delete the categories (types of food) and tags (keywords) available on the site. */
@@ -25,7 +26,6 @@ export default function ManageTaxonomy({
   const router = useRouter();
   const [tax, setTax] = useState<Taxonomy>(initial);
   const [newCategory, setNewCategory] = useState("");
-  const [newBaking, setNewBaking] = useState(false);
   const [newTag, setNewTag] = useState("");
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
@@ -67,31 +67,27 @@ export default function ManageTaxonomy({
         </div>
 
         <form
-          className="space-y-2"
+          className="flex items-center gap-2"
           onSubmit={async (e) => {
             e.preventDefault();
             if (!newCategory.trim()) return;
-            await send({ op: "addCategory", name: newCategory, baking: newBaking });
+            await send({ op: "addCategory", name: newCategory });
             setNewCategory("");
-            setNewBaking(false);
           }}
         >
-          <div className="flex items-center gap-2">
-            <input dir="auto" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category" aria-label="New category" className={`${inputCls} min-w-0 flex-1 py-2`} />
-            <button type="submit" className={btnDark}>
-              <PlusIcon className="h-3.5 w-3.5" />
-              Add
-            </button>
-          </div>
-          <label className="flex items-center gap-2 text-[11px] font-medium text-muted">
-            <input type="checkbox" checked={newBaking} onChange={(e) => setNewBaking(e.target.checked)} className="h-4 w-4 accent-[#ff5722]" />
-            Baking category (amounts change by pan size)
-          </label>
+          <input dir="auto" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} placeholder="New category" aria-label="New category" className={`${inputCls} min-w-0 flex-1 py-2`} />
+          <button type="submit" className={btnDark}>
+            <PlusIcon className="h-3.5 w-3.5" />
+            Add
+          </button>
         </form>
 
         <ul className="space-y-2">
-          {tax.categories.map((c: Category) => (
+          {tax.categories.map((c) => (
             <li key={c.id} className={`flex items-center gap-2 p-2 ${rowCls}`}>
+              <span className={countBadge} title="Recipes in this category">
+                {categoryCounts[c.id] ?? 0}
+              </span>
               <input
                 key={c.name}
                 dir="auto"
@@ -105,11 +101,6 @@ export default function ManageTaxonomy({
                 onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                 className={nameField}
               />
-              <span className="text-[11px] tabular-nums text-muted">{categoryCounts[c.id] ?? 0}</span>
-              <label className="flex items-center gap-1 text-[11px] font-semibold text-muted">
-                <input type="checkbox" checked={!!c.baking} onChange={(e) => void send({ op: "setBaking", id: c.id, baking: e.target.checked })} className="h-4 w-4 accent-[#ff5722]" />
-                Baking
-              </label>
               <button type="button" aria-label={`Delete ${c.name}`} onClick={() => setPending({ kind: "category", id: c.id, name: c.name, count: categoryCounts[c.id] ?? 0 })} className={trashBtn}>
                 <TrashIcon className="h-3.5 w-3.5" />
               </button>
@@ -145,6 +136,9 @@ export default function ManageTaxonomy({
         <ul className="space-y-2">
           {tax.tags.map((t) => (
             <li key={t} className={`flex items-center gap-2 p-2 ${rowCls}`}>
+              <span className={countBadge} title="Recipes with this tag">
+                {tagCounts[t] ?? 0}
+              </span>
               <input
                 key={t}
                 dir="auto"
@@ -158,7 +152,6 @@ export default function ManageTaxonomy({
                 onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
                 className={nameField}
               />
-              <span className="text-[11px] tabular-nums text-muted">{tagCounts[t] ?? 0}</span>
               <button type="button" aria-label={`Delete tag ${t}`} onClick={() => setPending({ kind: "tag", name: t, count: tagCounts[t] ?? 0 })} className={trashBtn}>
                 <TrashIcon className="h-3.5 w-3.5" />
               </button>

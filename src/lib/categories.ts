@@ -27,6 +27,13 @@ export const DEFAULT_CATEGORIES: Category[] = [
   { id: "salad", name: "סלטים", en: "Salad" },
 ];
 
+const BAKING_WORDS = /עוג|לחם|מאפ|בצק|קינוח|פאי|טארט|cake|cookie|bread|pastr|dough|dessert|\bpie|tart|muffin/i;
+
+/** Whether a category name sounds like baking (cake, cookies, bread, dessert...). New categories get the baking setting from this. */
+export function isBakingName(name: string): boolean {
+  return BAKING_WORDS.test(name);
+}
+
 export interface Taxonomy {
   categories: Category[];
   /** Every tag available on the site */

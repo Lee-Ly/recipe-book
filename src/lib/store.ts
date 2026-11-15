@@ -1,6 +1,6 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { DEFAULT_CATEGORIES, type Category, type Taxonomy } from "./categories";
+import { DEFAULT_CATEGORIES, isBakingName, type Category, type Taxonomy } from "./categories";
 import type { Recipe } from "./types";
 
 // Local JSON storage. Everything goes through this file so it can be swapped
@@ -131,9 +131,8 @@ export async function getTaxonomy(): Promise<Taxonomy> {
 }
 
 export type TaxonomyChange =
-  | { op: "addCategory"; name: string; baking?: boolean }
+  | { op: "addCategory"; name: string }
   | { op: "renameCategory"; id: string; name: string }
-  | { op: "setBaking"; id: string; baking: boolean }
   | { op: "deleteCategory"; id: string }
   | { op: "addTag"; name: string }
   | { op: "renameTag"; from: string; to: string }
@@ -149,14 +148,14 @@ export function changeTaxonomy(change: TaxonomyChange): Promise<Taxonomy> {
 
     if (change.op === "addCategory") {
       const name = change.name.trim();
-      if (name && !tax.categories.some((c) => same(c.name, name))) tax.categories.push({ id: `c${Date.now().toString(36)}`, name, baking: change.baking === true });
+      if (name && !tax.categories.some((c) => same(c.name, name))) tax.categories.push({ id: `c${Date.now().toString(36)}`, name, baking: isBakingName(name) });
     } else if (change.op === "renameCategory") {
       const name = change.name.trim();
       const c = tax.categories.find((x) => x.id === change.id);
-      if (c && name) c.name = name;
-    } else if (change.op === "setBaking") {
-      const c = tax.categories.find((x) => x.id === change.id);
-      if (c) c.baking = change.baking;
+      if (c && name) {
+        c.name = name;
+        if (isBakingName(name)) c.baking = true;
+      }
     } else if (change.op === "deleteCategory") {
       tax.categories = tax.categories.filter((c) => c.id !== change.id);
       for (const r of recipes) {

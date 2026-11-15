@@ -24,7 +24,7 @@ export async function PUT(req: Request, { params }: Ctx) {
       await removeImage(existing.image);
       image = null;
     }
-    await upsertRecipe({ ...existing, ...input.draft, sourceUrl: input.sourceUrl, image });
+    await upsertRecipe({ ...existing, ...input.draft, sourceUrl: input.sourceUrl, image, notes: input.notes ?? existing.notes });
     return Response.json({ id, imageWarning: warning });
   } catch (err) {
     return Response.json({ error: err instanceof Error ? err.message : "Couldn't save." }, { status: 400 });
