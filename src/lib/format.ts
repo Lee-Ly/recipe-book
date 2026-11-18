@@ -21,6 +21,11 @@ function round(n: number): string {
   return n < 10 ? String(Math.round(n * 10) / 10) : String(Math.round(n));
 }
 
+/** A scaled amount is written exactly (two decimals at most, no fractions or rounding to whole numbers). */
+function exact(n: number): string {
+  return String(Math.round(n * 100) / 100);
+}
+
 export type UnitMode = "cups" | "grams" | "ml";
 
 /**
@@ -42,15 +47,15 @@ export function formatAmount(ing: Ingredient, language: string, unit: UnitMode =
     const n = v * factor;
     if (u === "cups") {
       const word = he ? (n > 1 ? "כוסות" : "כוס") : n > 1 ? "cups" : "cup";
-      return `${approx(cupsWritten)}${formatCups(n)} ${word}`;
+      return `${approx(cupsWritten)}${factor === 1 ? formatCups(n) : exact(n)} ${word}`;
     }
-    if (u === "grams") return `${approx(gramsWritten)}${round(n)} ${he ? "גרם" : "g"}`;
-    return `${approx(mlWritten)}${round(n)} ${he ? "מ״ל" : "ml"}`;
+    if (u === "grams") return `${approx(gramsWritten)}${factor === 1 ? round(n) : exact(n)} ${he ? "גרם" : "g"}`;
+    return `${approx(mlWritten)}${factor === 1 ? round(n) : exact(n)} ${he ? "מ״ל" : "ml"}`;
   }
   // Nothing to convert (for example "2 pcs"): scale the number written in front.
   if (factor !== 1) {
     const m = /^(\d+(?:[.,]\d+)?)(.*)$/.exec(ing.original.trim());
-    if (m) return `${Math.round(Number(m[1].replace(",", ".")) * factor * 100) / 100}${m[2]}`;
+    if (m) return `${exact(Number(m[1].replace(",", ".")) * factor)}${m[2]}`;
   }
   return ing.original;
 }

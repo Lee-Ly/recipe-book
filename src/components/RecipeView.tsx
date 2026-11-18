@@ -6,12 +6,14 @@ import { useEffect, useState } from "react";
 import { categoryName, type Category } from "@/lib/categories";
 import { formatAmount, formatDuration, LABELS, type UnitMode } from "@/lib/format";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
-import { isBaking } from "@/lib/pan";
+import { isBaking, isSeasoning, matchPreset, PAN_PRESETS, panArea, SERVINGS_OPTIONS, seasoningFactor } from "@/lib/pan";
 import { splitStepTimes } from "@/lib/steps";
 import { startTimer } from "@/lib/timer-store";
 import type { Pan, Recipe } from "@/lib/types";
 import { CheckIcon, TimerIcon } from "./icons";
 import { btnDark, btnGhost, btnText, categoryPill, cardCls, fieldLabel, inputCls, panelCls, rowCls, sectionTitle, tagPill } from "./ui";
+
+const tileSelect = "w-full cursor-pointer rounded-md bg-transparent py-0.5 font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
 
 const UNITS: UnitMode[] = ["cups", "grams", "ml"];
 
@@ -115,6 +117,8 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [current, setCurrent] = useState<number | null>(null);
   const [people, setPeople] = useState(recipe.servings ?? 0);
+  const originalPreset = recipe.pan ? matchPreset(recipe.pan) : undefined;
+  const [panId, setPanId] = useState(originalPreset?.id ?? "original");
 
   useEffect(() => {
     if (!owner) return;
@@ -125,18 +129,23 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
     }
   }, [owner, recipe.id]);
 
-  // Cooking recipes scale by the number of people. The pan size is shown in the details tiles only.
-  const factor = !baking && recipe.servings ? people / recipe.servings : 1;
+  // Baking recipes scale by pan area (needs the recipe's own pan); cooking recipes scale by the number of people.
+  const canScalePan = baking && !!recipe.pan;
+  const canScalePeople = !baking && !!recipe.servings;
+  const chosenPan = PAN_PRESETS.find((p) => p.id === panId);
+  const factor = canScalePan && recipe.pan && chosenPan ? chosenPan.area / panArea(recipe.pan) : canScalePeople && recipe.servings ? people / recipe.servings : 1;
+  const seasoningsAdjusted = canScalePeople && factor > 1.5 && recipe.ingredients.some((i) => isSeasoning(i.name));
+  const peopleOptions = [...new Set([...SERVINGS_OPTIONS, recipe.servings ?? 0])].filter((n) => n > 0).sort((a, b) => a - b);
 
   const imageSrc = recipe.image ? `/api/img/${recipe.image}${shareToken ? `?t=${shareToken}` : ""}` : null;
   const byline = recipe.author || hostOf(recipe.sourceUrl);
   // The recipe's details, shown as small tiles under the categories. Only the ones that are filled in.
-  const details = [
+  const details: { label: string; value: string; control?: "pan" | "people" }[] = [
     recipe.ovenCelsius != null ? { label: labels.oven, value: `${recipe.ovenCelsius}°C` } : null,
     recipe.totalMinutes ? { label: labels.time, value: formatDuration(recipe.totalMinutes, recipe.language) } : null,
-    recipe.servings ? { label: labels.serves, value: String(recipe.servings) } : null,
-    recipe.pan ? { label: labels.pan, value: panText(recipe.pan, he) } : null,
-  ].filter((d): d is { label: string; value: string } => d !== null);
+    recipe.servings ? { label: labels.serves, value: String(recipe.servings), control: canScalePeople ? ("people" as const) : undefined } : null,
+    recipe.pan ? { label: labels.pan, value: panText(recipe.pan, he), control: canScalePan ? ("pan" as const) : undefined } : null,
+  ].filter((d): d is NonNullable<typeof d> => d !== null);
   const progress = he ? `${checked.size} מתוך ${recipe.ingredients.length} ${labels.prepped}` : `${checked.size} of ${recipe.ingredients.length} ${labels.prepped}`;
 
   function toggle(i: number) {
@@ -180,7 +189,28 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
             <div key={d.label} className="rounded-xl border border-line bg-accent-soft px-3 py-2">
               <dt className="text-[10px] font-bold uppercase tracking-wider text-muted">{d.label}</dt>
               <dd className="mt-0.5 text-sm font-bold">
-                <bdi>{d.value}</bdi>
+                {d.control === "pan" ? (
+                  <select aria-label={labels.pan} value={panId} onChange={(e) => setPanId(e.target.value)} className={tileSelect}>
+                    {!originalPreset && recipe.pan && <option value="original">{panText(recipe.pan, he)}</option>}
+                    {PAN_PRESETS.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {he ? p.he : p.en}
+                        {p.id === originalPreset?.id ? (he ? " (מקורי)" : " (original)") : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : d.control === "people" ? (
+                  <select aria-label={labels.serves} value={people} onChange={(e) => setPeople(Number(e.target.value))} className={tileSelect}>
+                    {peopleOptions.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                        {n === recipe.servings ? (he ? " (מקורי)" : " (original)") : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <bdi>{d.value}</bdi>
+                )}
               </dd>
             </div>
           ))}
@@ -208,23 +238,12 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
                   </button>
                 ))}
               </div>
-              {!baking && recipe.servings ? (
-                <div className="inline-flex items-center rounded-lg border border-line bg-card px-1.5 py-0.5 text-xs font-bold tabular-nums">
-                  <button type="button" aria-label="Fewer people" disabled={people <= 1} onClick={() => setPeople(people - 1)} className="flex h-6 w-6 items-center justify-center text-chip-text hover:text-accent active:text-accent disabled:opacity-40">
-                    &minus;
-                  </button>
-                  <span className="px-1.5">{people}</span>
-                  <button type="button" aria-label="More people" onClick={() => setPeople(people + 1)} className="flex h-6 w-6 items-center justify-center text-chip-text hover:text-accent active:text-accent">
-                    &plus;
-                  </button>
-                </div>
-              ) : null}
             </div>
           </div>
 
           <ul className="space-y-2">
             {recipe.ingredients.map((ing, i) => {
-              const amount = formatAmount(ing, recipe.language, unit, factor);
+              const amount = formatAmount(ing, recipe.language, unit, canScalePeople && isSeasoning(ing.name) ? seasoningFactor(factor) : factor);
               const on = checked.has(i);
               return (
                 <li key={i}>
@@ -246,6 +265,12 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
             })}
           </ul>
           {recipe.ingredients.some((i) => i.converted) && <p className="text-[11px] text-muted">{labels.estimate}</p>}
+          {factor !== 1 && (
+            <p className="text-[11px] text-muted">
+              <bdi>×{Math.round(factor * 100) / 100}</bdi>
+              {seasoningsAdjusted ? (he ? " · מלח ותבלינים הוגדלו עד ×1.5 בלבד. טעמו והתאימו." : " · Salt and spices grow by 1.5x at most. Taste and adjust.") : ""}
+            </p>
+          )}
         </section>
       )}
 
