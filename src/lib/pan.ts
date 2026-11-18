@@ -21,11 +21,12 @@ export interface PanPreset {
   area: number;
 }
 
-const roundPan = (a: number, area: number): PanPreset => ({ id: `round-${a}`, he: `עגולה ${a} ס״מ`, en: `Round ${a} cm`, pan: { shape: "round", a, b: null }, area });
+const roundPan = (a: number, area: number): PanPreset => ({ id: `round-${a}`, he: `${a} ס״מ`, en: `${a} cm`, pan: { shape: "round", a, b: null }, area });
 const boxPan = (id: string, he: string, en: string, a: number, b: number): PanPreset => ({
   id,
-  he: `${he} ${a}×${b} ס״מ`,
-  en: `${en} ${a}×${b} cm`,
+  // The size is wrapped in an isolate (U+2066 ... U+2069) so "30×10" is not shown backwards in right-to-left text.
+  he: `${he ? `${he} ` : ""}⁦${a}×${b}⁩ ס״מ`,
+  en: `${en ? `${en} ` : ""}${a}×${b} cm`,
   pan: { shape: a === b ? "square" : "rect", a, b: a === b ? null : b },
   area: a * b,
 });
@@ -37,14 +38,13 @@ export const PAN_PRESETS: PanPreset[] = [
   roundPan(24, 452),
   roundPan(26, 531),
   roundPan(28, 615),
-  boxPan("loaf-short", "אינגליש קייק קצרה", "Short loaf", 25, 10),
-  boxPan("loaf-classic", "אינגליש קייק קלאסית", "Classic loaf", 30, 10),
-  boxPan("square-small", "מרובעת קטנה (בראוניז)", "Small square (brownies)", 20, 20),
-  boxPan("square-medium", "מרובעת בינונית", "Medium square", 24, 24),
-  boxPan("rect-small-medium", "מלבנית בינונית-קטנה", "Medium-small rectangle", 30, 20),
-  boxPan("rect-medium", "מלבנית בינונית", "Medium rectangle", 32, 25),
-  boxPan("rect-large", "מלבנית גדולה", "Large rectangle", 35, 25),
-  boxPan("oven-tray", "תבנית תנור סטנדרטית", "Standard oven tray", 40, 32),
+  boxPan("loaf", "אינגליש קייק", "Loaf", 30, 10),
+  boxPan("square-20", "", "", 20, 20),
+  boxPan("square-24", "", "", 24, 24),
+  boxPan("rect-30x20", "", "", 30, 20),
+  boxPan("rect-32x25", "", "", 32, 25),
+  boxPan("rect-35x25", "", "", 35, 25),
+  boxPan("oven-tray", "תבנית תנור", "Oven tray", 40, 32),
 ];
 
 /** The listed pan that is the same pan (a rectangle matches in either direction), or undefined. */

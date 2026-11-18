@@ -11,16 +11,15 @@ import { splitStepTimes } from "@/lib/steps";
 import { startTimer } from "@/lib/timer-store";
 import type { Pan, Recipe } from "@/lib/types";
 import { CheckIcon, TimerIcon } from "./icons";
+import TileSelect, { type TileOption } from "./TileSelect";
 import { btnDark, btnGhost, btnText, categoryPill, cardCls, fieldLabel, inputCls, panelCls, rowCls, sectionTitle, tagPill } from "./ui";
-
-const tileSelect = "w-full cursor-pointer rounded-md bg-transparent py-0.5 font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/30";
 
 const UNITS: UnitMode[] = ["cups", "grams", "ml"];
 
 /** "עגולה 20 ס״מ", "Round 20 cm", "20 × 30 cm". */
 function panText(pan: Pan, he: boolean): string {
   const unit = he ? "ס״מ" : "cm";
-  if (pan.shape === "rect") return `${pan.a} × ${pan.b ?? pan.a} ${unit}`;
+  if (pan.shape === "rect") return he ? `⁦${pan.a}×${pan.b ?? pan.a}⁩ ${unit}` : `${pan.a} × ${pan.b ?? pan.a} ${unit}`;
   const shape = he ? (pan.shape === "round" ? LABELS.he.round : LABELS.he.square) : pan.shape === "round" ? LABELS.en.round : LABELS.en.square;
   return `${shape} ${pan.a} ${unit}`;
 }
@@ -138,8 +137,12 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
   const canScalePeople = !canScalePan && !!recipe.servings;
   const chosenPan = PAN_PRESETS.find((p) => p.id === panId);
   const factor = canScalePan && recipe.pan && chosenPan ? chosenPan.area / panArea(recipe.pan) : canScalePeople && recipe.servings ? people / recipe.servings : 1;
+  const panOptions: TileOption[] = [
+    ...(!originalPreset && recipe.pan ? [{ value: "original", label: panText(recipe.pan, he), hint: areaText(panArea(recipe.pan), he), original: true }] : []),
+    ...PAN_PRESETS.map((p) => ({ value: p.id, label: he ? p.he : p.en, hint: areaText(p.area, he), original: p.id === originalPreset?.id })),
+  ];
   const seasoningsAdjusted = canScalePeople && factor > 1.5 && recipe.ingredients.some((i) => isSeasoning(i.name));
-  const peopleOptions = [...new Set([...SERVINGS_OPTIONS, recipe.servings ?? 0])].filter((n) => n > 0).sort((a, b) => a - b);
+  const peopleCounts = [...new Set([...SERVINGS_OPTIONS, recipe.servings ?? 0])].filter((n) => n > 0).sort((a, b) => a - b);
 
   const imageSrc = recipe.image ? `/api/img/${recipe.image}${shareToken ? `?t=${shareToken}` : ""}` : null;
   const byline = recipe.author || hostOf(recipe.sourceUrl);
@@ -194,24 +197,9 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
               <dt className="text-[10px] font-bold uppercase tracking-wider text-muted">{d.label}</dt>
               <dd className="mt-0.5 text-sm font-bold">
                 {d.control === "pan" ? (
-                  <select aria-label={labels.pan} autoComplete="off" value={panId} onChange={(e) => setPanId(e.target.value)} className={tileSelect}>
-                    {!originalPreset && recipe.pan && (
-                      <option value="original">{`${panText(recipe.pan, he)} · ${areaText(panArea(recipe.pan), he)} · ${he ? "מקורי" : "original"}`}</option>
-                    )}
-                    {PAN_PRESETS.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {`${he ? p.he : p.en} · ${areaText(p.area, he)}${p.id === originalPreset?.id ? (he ? " · מקורי" : " · original") : ""}`}
-                      </option>
-                    ))}
-                  </select>
+                  <TileSelect label={labels.pan} originalLabel={he ? "מקורי" : "original"} value={panId} onChange={setPanId} options={panOptions} />
                 ) : d.control === "people" ? (
-                  <select aria-label={labels.serves} autoComplete="off" value={people} onChange={(e) => setPeople(Number(e.target.value))} className={tileSelect}>
-                    {peopleOptions.map((n) => (
-                      <option key={n} value={n}>
-                        {`${n}${n === recipe.servings ? (he ? " · מקורי" : " · original") : ""}`}
-                      </option>
-                    ))}
-                  </select>
+                  <TileSelect label={labels.serves} originalLabel={he ? "מקורי" : "original"} value={String(people)} onChange={(v) => setPeople(Number(v))} options={peopleCounts.map((n) => ({ value: String(n), label: String(n), original: n === recipe.servings }))} />
                 ) : (
                   <bdi>{d.value}</bdi>
                 )}
@@ -271,7 +259,7 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
                     <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${on ? "border-foreground bg-foreground text-background" : "border-line-strong bg-card"}`}>
                       {on && <CheckIcon className="h-3.5 w-3.5" />}
                     </span>
-                    {amount && <bdi className="min-w-[68px] text-xs font-bold tabular-nums text-accent">{amount}</bdi>}
+                    {amount && <bdi className="inline-block w-[76px] shrink-0 text-start text-xs font-bold tabular-nums text-accent">{amount}</bdi>}
                     <span className={`text-sm font-medium ${on ? "text-muted line-through" : ""}`}>{ing.name}</span>
                   </button>
                 </li>
