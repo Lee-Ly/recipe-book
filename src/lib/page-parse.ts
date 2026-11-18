@@ -110,10 +110,16 @@ export function focusRecipeText(text: string): string {
   // A second copy of the recipe (for example a hidden print version) starts with the same word after the method.
   const method = after.search(METHOD_WORD);
   const repeat = after.indexOf(found[0], found[0].length + 1);
-  if (method > 0 && repeat > method) end = Math.min(end, at + repeat);
+  let repeated = false;
+  if (method > 0 && repeat > method) {
+    end = Math.min(end, at + repeat);
+    repeated = true;
+  }
   const stop = after.search(PAGE_END);
   if (stop > 0) end = Math.min(end, at + stop);
-  return text.slice(start, end).trim();
+  const kept = text.slice(start, end).trim();
+  // The copy starts with its own title line, right before the repeated word: that line belongs to the copy.
+  return repeated ? kept.slice(0, kept.lastIndexOf("\n")).trim() : kept;
 }
 
 export function parsePage(html: string): PageInfo {

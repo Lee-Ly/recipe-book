@@ -33,6 +33,8 @@ export interface RecipeDraft {
   pan: Pan | null;
   tags: string[];
   categories: string[];
+  /** Tips and remarks the source adds after the method (storage, substitutions). Offered as the owner's notes. */
+  notes?: string;
 }
 
 export interface Recipe extends RecipeDraft {

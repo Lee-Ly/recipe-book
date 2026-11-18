@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { categoryName, type Category } from "@/lib/categories";
 import { formatAmount, formatDuration, LABELS, type UnitMode } from "@/lib/format";
 import { LAST_VIEWED_KEY } from "@/lib/last-viewed";
-import { isBaking, isSeasoning, matchPreset, PAN_PRESETS, panArea, SERVINGS_OPTIONS, seasoningFactor } from "@/lib/pan";
+import { isSeasoning, matchPreset, PAN_PRESETS, panArea, SERVINGS_OPTIONS, seasoningFactor } from "@/lib/pan";
 import { splitStepTimes } from "@/lib/steps";
 import { startTimer } from "@/lib/timer-store";
 import type { Pan, Recipe } from "@/lib/types";
@@ -23,6 +23,11 @@ function panText(pan: Pan, he: boolean): string {
   if (pan.shape === "rect") return `${pan.a} × ${pan.b ?? pan.a} ${unit}`;
   const shape = he ? (pan.shape === "round" ? LABELS.he.round : LABELS.he.square) : pan.shape === "round" ? LABELS.en.round : LABELS.en.square;
   return `${shape} ${pan.a} ${unit}`;
+}
+
+/** "314 סמ״ר" / "314 cm²" (rounded to a whole number). */
+function areaText(area: number, he: boolean): string {
+  return `${Math.round(area)} ${he ? "סמ״ר" : "cm²"}`;
 }
 
 /** The website name of a link, for recipes that have no author. */
@@ -112,7 +117,6 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
   const he = recipe.language === "he";
   const labels = he ? LABELS.he : LABELS.en;
   const owner = !shareToken;
-  const baking = isBaking(recipe.categories, categories);
   const [unit, setUnit] = useState<UnitMode>("grams");
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [current, setCurrent] = useState<number | null>(null);
@@ -129,9 +133,9 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
     }
   }, [owner, recipe.id]);
 
-  // Baking recipes scale by pan area (needs the recipe's own pan); cooking recipes scale by the number of people.
-  const canScalePan = baking && !!recipe.pan;
-  const canScalePeople = !baking && !!recipe.servings;
+    // A recipe that states a pan is scaled by pan (whatever its category); otherwise by the number of people.
+  const canScalePan = !!recipe.pan;
+  const canScalePeople = !canScalePan && !!recipe.servings;
   const chosenPan = PAN_PRESETS.find((p) => p.id === panId);
   const factor = canScalePan && recipe.pan && chosenPan ? chosenPan.area / panArea(recipe.pan) : canScalePeople && recipe.servings ? people / recipe.servings : 1;
   const seasoningsAdjusted = canScalePeople && factor > 1.5 && recipe.ingredients.some((i) => isSeasoning(i.name));
@@ -190,26 +194,36 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
               <dt className="text-[10px] font-bold uppercase tracking-wider text-muted">{d.label}</dt>
               <dd className="mt-0.5 text-sm font-bold">
                 {d.control === "pan" ? (
-                  <select aria-label={labels.pan} value={panId} onChange={(e) => setPanId(e.target.value)} className={tileSelect}>
-                    {!originalPreset && recipe.pan && <option value="original">{panText(recipe.pan, he)}</option>}
+                  <select aria-label={labels.pan} autoComplete="off" value={panId} onChange={(e) => setPanId(e.target.value)} className={tileSelect}>
+                    {!originalPreset && recipe.pan && (
+                      <option value="original">{`${panText(recipe.pan, he)} · ${areaText(panArea(recipe.pan), he)} · ${he ? "מקורי" : "original"}`}</option>
+                    )}
                     {PAN_PRESETS.map((p) => (
                       <option key={p.id} value={p.id}>
-                        {he ? p.he : p.en}
-                        {p.id === originalPreset?.id ? (he ? " (מקורי)" : " (original)") : ""}
+                        {`${he ? p.he : p.en} · ${areaText(p.area, he)}${p.id === originalPreset?.id ? (he ? " · מקורי" : " · original") : ""}`}
                       </option>
                     ))}
                   </select>
                 ) : d.control === "people" ? (
-                  <select aria-label={labels.serves} value={people} onChange={(e) => setPeople(Number(e.target.value))} className={tileSelect}>
+                  <select aria-label={labels.serves} autoComplete="off" value={people} onChange={(e) => setPeople(Number(e.target.value))} className={tileSelect}>
                     {peopleOptions.map((n) => (
                       <option key={n} value={n}>
-                        {n}
-                        {n === recipe.servings ? (he ? " (מקורי)" : " (original)") : ""}
+                        {`${n}${n === recipe.servings ? (he ? " · מקורי" : " · original") : ""}`}
                       </option>
                     ))}
                   </select>
                 ) : (
                   <bdi>{d.value}</bdi>
+                )}
+                {d.control === "pan" && recipe.pan && factor !== 1 && (
+                  <span className="mt-0.5 block text-[10px] font-medium text-muted">
+                    <bdi>{`${he ? "מקורי" : "Original"}: ${panText(recipe.pan, he)} · ${areaText(panArea(recipe.pan), he)}`}</bdi>
+                  </span>
+                )}
+                {d.control === "people" && recipe.servings && people !== recipe.servings && (
+                  <span className="mt-0.5 block text-[10px] font-medium text-muted">
+                    <bdi>{`${he ? "מקורי" : "Original"}: ${recipe.servings}`}</bdi>
+                  </span>
                 )}
               </dd>
             </div>

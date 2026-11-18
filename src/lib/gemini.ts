@@ -3,7 +3,7 @@ import type { Ingredient, Pan, RecipeDraft } from "./types";
 
 const BASE = "https://generativelanguage.googleapis.com/v1beta";
 // Google retires models often, so the name is configurable and we fall back to the moving alias.
-const MODELS = [process.env.GEMINI_MODEL ?? "gemini-3.5-flash", "gemini-flash-latest"];
+const MODELS = [process.env.GEMINI_MODEL ?? "gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
 
 const SCHEMA = {
   type: "OBJECT",
@@ -39,6 +39,7 @@ const SCHEMA = {
       },
       required: ["shape", "a"],
     },
+    notes: { type: "STRING" },
     tags: { type: "ARRAY", items: { type: "STRING" } },
     categories: { type: "ARRAY", items: { type: "STRING" } },
   },
@@ -58,6 +59,8 @@ Rules:
 - servings = the number of people or portions only if the text states it, otherwise null. pan = the baking pan only if the text states its size (sizes are always in cm, never inches, even if the text says "inch" or uses a small number; round: a = diameter; square: a = side; rect: a = length, b = width), otherwise null. Never guess either.
 - tags: 3-8 short keywords in the recipe's language that describe THIS dish (main ingredients, style, occasion, diet such as gluten-free). A tag is not a category.${tagHint}
 - categories: the TYPE of food. Choose 1-3 ids exactly from this list: ${cats}. Add "vegan" only if the recipe has no meat, fish, dairy, eggs or honey. Add "dairy" if it contains dairy. Use [] if none fits.
+- ingredients are only real ingredients with an amount or a name. A sub-heading inside the list (for example "לעוגה:", "For the sauce:") is NOT an ingredient: leave it out.
+- steps are only the method. Tips and remarks the author adds after the method (storage, substitutions, "enjoy!", lines starting with * or **) are NOT steps: put them together in "notes" (empty string if none).
 - Do not invent ingredients or steps. If the text contains no recipe (no ingredients and no method), return empty ingredients and steps arrays.
 
 Text:
@@ -107,6 +110,7 @@ export function normalizeDraft(raw: Record<string, unknown>, knownCategories?: S
     author: str(raw.author),
     ingredients,
     steps: strings(raw.steps),
+    notes: str(raw.notes),
     ovenCelsius: num(raw.ovenCelsius),
     totalMinutes: num(raw.totalMinutes),
     servings: (num(raw.servings) ?? 0) > 0 ? num(raw.servings) : null,
