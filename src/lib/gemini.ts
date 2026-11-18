@@ -5,6 +5,9 @@ const BASE = "https://generativelanguage.googleapis.com/v1beta";
 // Google retires models often, so the name is configurable and we fall back to the moving alias.
 const MODELS = [process.env.GEMINI_MODEL ?? "gemini-3.5-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
 
+const TOTAL_BUDGET_MS = 48000;
+const PER_TRY_MS = 35000;
+
 const SCHEMA = {
   type: "OBJECT",
   properties: {
@@ -129,12 +132,16 @@ export function geminiConfigured(): boolean {
 export async function callGemini(prompt: string, schema: unknown): Promise<unknown> {
   if (!geminiConfigured()) throw new Error("GEMINI_API_KEY is not set");
   let lastError = "unknown error";
+  // Never wait longer than this in total: when Google is overloaded the owner gets the basic parser within the 60 second function limit.
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   // An overloaded model (HTTP 429 or 5xx) often recovers within seconds, so after one pass over the models, try them once more.
   for (const [i, model] of [...MODELS, ...MODELS].entries()) {
     if (i === MODELS.length) {
       if (!/HTTP (429|5)/.test(lastError)) break;
       await new Promise((resolve) => setTimeout(resolve, 2500));
     }
+    const left = deadline - Date.now();
+    if (left < 4000) break;
     try {
       const res = await fetch(`${BASE}/models/${model}:generateContent`, {
         method: "POST",
@@ -143,7 +150,7 @@ export async function callGemini(prompt: string, schema: unknown): Promise<unkno
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.1 },
         }),
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(Math.min(PER_TRY_MS, left)),
       });
       if (!res.ok) {
         lastError = `${model}: HTTP ${res.status}`;
