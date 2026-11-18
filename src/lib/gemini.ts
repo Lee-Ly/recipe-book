@@ -125,7 +125,12 @@ export function geminiConfigured(): boolean {
 export async function callGemini(prompt: string, schema: unknown): Promise<unknown> {
   if (!geminiConfigured()) throw new Error("GEMINI_API_KEY is not set");
   let lastError = "unknown error";
-  for (const model of MODELS) {
+  // An overloaded model (HTTP 429 or 5xx) often recovers within seconds, so after one pass over the models, try them once more.
+  for (const [i, model] of [...MODELS, ...MODELS].entries()) {
+    if (i === MODELS.length) {
+      if (!/HTTP (429|5)/.test(lastError)) break;
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+    }
     try {
       const res = await fetch(`${BASE}/models/${model}:generateContent`, {
         method: "POST",

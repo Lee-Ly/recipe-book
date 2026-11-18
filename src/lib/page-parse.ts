@@ -82,13 +82,38 @@ function isoDurationToMinutes(v: unknown): number | null {
 function stripTags(html: string): string {
   return decodeEntities(
     html
-      .replace(/<(script|style|noscript|svg|head)\b[\s\S]*?<\/\1>/gi, " ")
+      .replace(/<(script|style|noscript|svg|head|nav|header|footer|aside|form|template)\b[\s\S]*?<\/\1>/gi, " ")
       .replace(/<br\s*\/?>|<\/(p|div|li|h\d|tr)>/gi, "\n")
       .replace(/<[^>]+>/g, " "),
   )
     .replace(/[ \t]+/g, " ")
     .replace(/\n\s*\n+/g, "\n")
     .trim();
+}
+
+const RECIPE_ANCHOR = /מצרכים|מרכיבים|רכיבים|חומרים|ingredients/i;
+const METHOD_WORD = /אופן ההכנה|הוראות הכנה|הכנה|instructions|method|directions/i;
+const PAGE_END = /תגובות|הוסיפו תגובה|מתכונים נוספים|מתכונים דומים|you may also like|related (posts|recipes)|leave a (reply|comment)/i;
+
+/**
+ * A page without schema.org recipe data: keep only the recipe part of the page text instead of its first 12,000 characters,
+ * which are usually the site menu. The recipe starts a little before the word "Ingredients" (title, times, and often the pan
+ * in the title) and ends at the comments / related recipes, or where the page repeats itself (a hidden print copy).
+ */
+export function focusRecipeText(text: string): string {
+  const found = RECIPE_ANCHOR.exec(text);
+  if (!found) return text.slice(0, 12000);
+  const at = found.index;
+  const start = Math.max(0, at - 700);
+  let end = Math.min(text.length, at + 7000);
+  const after = text.slice(at);
+  // A second copy of the recipe (for example a hidden print version) starts with the same word after the method.
+  const method = after.search(METHOD_WORD);
+  const repeat = after.indexOf(found[0], found[0].length + 1);
+  if (method > 0 && repeat > method) end = Math.min(end, at + repeat);
+  const stop = after.search(PAGE_END);
+  if (stop > 0) end = Math.min(end, at + stop);
+  return text.slice(start, end).trim();
 }
 
 export function parsePage(html: string): PageInfo {
@@ -131,6 +156,6 @@ export function parsePage(html: string): PageInfo {
     description: metaContent(html, "og:description") ?? metaContent(html, "description"),
     imageUrl,
     recipeText,
-    bodyText: stripTags(html).slice(0, 12000),
+    bodyText: focusRecipeText(stripTags(html)),
   };
 }

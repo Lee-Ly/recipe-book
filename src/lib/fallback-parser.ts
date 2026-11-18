@@ -1,7 +1,8 @@
-import type { Ingredient, RecipeDraft } from "./types";
+import type { Ingredient, Pan, RecipeDraft } from "./types";
 
-const INGREDIENT_HEADS = /^(מצרכים|מרכיבים|רכיבים|ingredients?)\s*:?$/i;
-const STEP_HEADS = /^(אופן ההכנה|הוראות הכנה|הכנה|אופן הכנה|instructions?|directions?|method|steps?)\s*:?$/i;
+// A heading may carry a few more words, such as "מצרכים למתכון :" or "Ingredients for the cake".
+const INGREDIENT_HEADS = /^(מצרכים|מרכיבים|רכיבים|ingredients?)(\s+\S+){0,3}\s*:?$/i;
+const STEP_HEADS = /^(אופן ההכנה|הוראות הכנה|הכנה|אופן הכנה|instructions?|directions?|method|steps?)(\s+\S+){0,2}\s*:?$/i;
 const LOOKS_LIKE_AMOUNT = /^(\d|[¼½¾⅓⅔]|קורט|כף|כפית|חצי|רבע|שלוש|שתי|a pinch|pinch)/i;
 
 function fahrenheitToCelsius(text: string): { text: string; celsius: number | null } {
@@ -12,6 +13,15 @@ function fahrenheitToCelsius(text: string): { text: string; celsius: number | nu
     return `${c}°C`;
   });
   return { text: converted, celsius };
+}
+
+/** A pan written in the text, always in cm: "קוטר 24" / "diameter 24" is round, "20×30" is a rectangle. */
+function findPan(text: string): Pan | null {
+  const round = /(?:בקוטר|קוטר|diameter)\s*(\d{2})/i.exec(text);
+  if (round) return { shape: "round", a: Number(round[1]), b: null };
+  const box = /(\d{2})\s*[x×*]\s*(\d{2})\s*(?:ס["״]?מ|cm)/i.exec(text);
+  if (box) return Number(box[1]) === Number(box[2]) ? { shape: "square", a: Number(box[1]), b: null } : { shape: "rect", a: Number(box[1]), b: Number(box[2]) };
+  return null;
 }
 
 /**
@@ -82,7 +92,7 @@ export function parseWithRules(text: string, fallbackTitle: string): RecipeDraft
     ovenCelsius,
     totalMinutes: null,
     servings: null,
-    pan: null,
+    pan: findPan(text),
     tags: [],
     categories: [],
   };
