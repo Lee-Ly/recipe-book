@@ -259,7 +259,9 @@ export default function RecipeView({ recipe, categories, shareToken, readOnly = 
                     <span aria-hidden className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition ${on ? "border-foreground bg-foreground text-background" : "border-line-strong bg-card"}`}>
                       {on && <CheckIcon className="h-3.5 w-3.5" />}
                     </span>
-                    {amount && <bdi className="inline-block w-[76px] shrink-0 text-start text-xs font-bold tabular-nums text-accent">{amount}</bdi>}
+                    {amount && <span className="inline-block w-[76px] shrink-0 text-start text-xs font-bold tabular-nums text-accent">
+                        <bdi>{amount}</bdi>
+                      </span>}
                     <span className={`text-sm font-medium ${on ? "text-muted line-through" : ""}`}>{ing.name}</span>
                   </button>
                 </li>
