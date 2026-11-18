@@ -1,6 +1,5 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import type { Taxonomy } from "./categories";
 import type { Backend } from "./store-backend";
 import type { Recipe } from "./types";
 
@@ -8,7 +7,7 @@ import type { Recipe } from "./types";
 const DATA_DIR = path.join(process.cwd(), "data");
 const RECIPES_FILE = path.join(DATA_DIR, "recipes.json");
 const IMAGE_DIR = path.join(DATA_DIR, "images");
-const TAXONOMY_FILE = path.join(DATA_DIR, "taxonomy.json");
+const settingFile = (key: string) => path.join(DATA_DIR, `${key.replace(/[^\w-]/g, "")}.json`);
 
 let writeQueue: Promise<unknown> = Promise.resolve();
 
@@ -56,16 +55,16 @@ export const localBackend: Backend = {
       await writeJson(RECIPES_FILE, (await readAll()).filter((r) => r.id !== id));
     });
   },
-  async readTaxonomy() {
+  async readSetting<T>(key: string) {
     try {
-      return JSON.parse(await fs.readFile(TAXONOMY_FILE, "utf8")) as Partial<Taxonomy>;
+      return JSON.parse(await fs.readFile(settingFile(key), "utf8")) as T;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
       throw err;
     }
   },
-  writeTaxonomy(taxonomy) {
-    return serialize(() => writeJson(TAXONOMY_FILE, taxonomy));
+  writeSetting(key, value) {
+    return serialize(() => writeJson(settingFile(key), value));
   },
   async putImage(name, data) {
     await fs.mkdir(IMAGE_DIR, { recursive: true });

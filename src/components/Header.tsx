@@ -4,7 +4,7 @@ import SiteHeader from "./SiteHeader";
 import { btnPrimary, headerTitleCls } from "./ui";
 
 /** Home header: logo mark and name on the left, the add button on the right. */
-export default function Header() {
+export default function Header({ canAdd = true }: { canAdd?: boolean }) {
   return (
     <SiteHeader
       left={
@@ -16,10 +16,12 @@ export default function Header() {
         </Link>
       }
       right={
-        <Link href="/add" className={btnPrimary}>
-          <PlusIcon />
-          <span>New</span>
-        </Link>
+        canAdd ? (
+          <Link href="/add" className={btnPrimary}>
+            <PlusIcon />
+            <span>New</span>
+          </Link>
+        ) : undefined
       }
     />
   );

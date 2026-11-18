@@ -1,10 +1,10 @@
-import { isAuthed } from "@/lib/auth";
+import { isViewer } from "@/lib/auth";
 import { listRecipes, readImage } from "@/lib/store";
 
-/** Serves a recipe photo to you, or to anyone holding that recipe's share token. */
+/** Serves a recipe photo to the owner, to a friend who is logged in, or to anyone holding that recipe's share token. */
 export async function GET(req: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params;
-  if (!(await isAuthed())) {
+  if (!(await isViewer())) {
     const token = new URL(req.url).searchParams.get("t") ?? "";
     const shared = token ? (await listRecipes()).find((r) => r.shareToken === token && r.image === name) : null;
     if (!shared) return new Response("Not found", { status: 404 });

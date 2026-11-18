@@ -42,7 +42,7 @@ function countLabel(n: number): string {
   return n === 1 ? "מתכון אחד" : `${n} מתכונים`;
 }
 
-export default function RecipeBrowser({ recipes, categories, initialQuery = "" }: { recipes: CardData[]; categories: Category[]; initialQuery?: string }) {
+export default function RecipeBrowser({ recipes, categories, initialQuery = "", readOnly = false }: { recipes: CardData[]; categories: Category[]; initialQuery?: string; readOnly?: boolean }) {
   const [query, setQuery] = useState(initialQuery);
   const [filter, setFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
@@ -203,6 +203,7 @@ export default function RecipeBrowser({ recipes, categories, initialQuery = "" }
                     ))}
                   </p>
                 </Link>
+                {!readOnly && (
                 <button
                   type="button"
                   onClick={() => toggleFavorite(r.id)}
@@ -212,6 +213,7 @@ export default function RecipeBrowser({ recipes, categories, initialQuery = "" }
                 >
                   <HeartIcon filled={!!favs[r.id]} className={`h-4 w-4 transition ${favs[r.id] ? "text-accent" : "text-muted-2"}`} />
                 </button>
+                )}
               </li>
             ))}
           </ul>
@@ -262,9 +264,11 @@ export default function RecipeBrowser({ recipes, categories, initialQuery = "" }
                 </li>
               ))}
             </ul>
-            <Link href="/manage" className="mt-4 block text-center text-xs font-bold text-accent hover:underline">
-              ניהול קטגוריות ותגיות
-            </Link>
+            {!readOnly && (
+              <Link href="/manage" className="mt-4 block text-center text-xs font-bold text-accent hover:underline">
+                ניהול קטגוריות ותגיות
+              </Link>
+            )}
           </div>
         </div>
       )}

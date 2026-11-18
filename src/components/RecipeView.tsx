@@ -106,7 +106,7 @@ function Notes({ id, initial, he }: { id: string; initial: string; he: boolean }
  * The recipe itself. Used by the owner (shareToken undefined) and by the public share page,
  * which gets read-only content without notes.
  */
-export default function RecipeView({ recipe, categories, shareToken }: { recipe: Recipe; categories: Category[]; shareToken?: string }) {
+export default function RecipeView({ recipe, categories, shareToken, readOnly = false }: { recipe: Recipe; categories: Category[]; shareToken?: string; readOnly?: boolean }) {
   const he = recipe.language === "he";
   const labels = he ? LABELS.he : LABELS.en;
   const owner = !shareToken;
@@ -301,7 +301,7 @@ export default function RecipeView({ recipe, categories, shareToken }: { recipe:
         </section>
       )}
 
-      {owner && <Notes id={recipe.id} initial={recipe.notes} he={he} />}
+      {owner && !readOnly && <Notes id={recipe.id} initial={recipe.notes} he={he} />}
 
       {recipe.tags.length > 0 && (
         <section>

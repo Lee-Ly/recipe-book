@@ -1,11 +1,17 @@
 import BackButton from "@/components/BackButton";
 import ManageTaxonomy from "@/components/ManageTaxonomy";
 import SiteHeader from "@/components/SiteHeader";
-import { requireAuth } from "@/lib/auth";
+import { getRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import PasswordGate from "@/components/PasswordGate";
 import { getTaxonomy, listRecipes } from "@/lib/store";
 
 export default async function ManagePage() {
-  await requireAuth("/manage");
+  const role = await getRole();
+  if (role !== "owner") {
+    if (role === "guest") redirect("/");
+    return <PasswordGate />;
+  }
   const [taxonomy, recipes] = await Promise.all([getTaxonomy(), listRecipes()]);
   const categoryCounts: Record<string, number> = {};
   const tagCounts: Record<string, number> = {};

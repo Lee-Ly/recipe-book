@@ -72,11 +72,17 @@ export async function readImage(name: string): Promise<{ data: Buffer; contentTy
   return data ? { data, contentType: IMAGE_TYPES[match[1]] } : null;
 }
 
+// ---------- settings ----------
+
+/** The raw "access" setting (friends' password). Logic lives in access.ts. */
+export const readAccessSetting = <T,>() => backend.readSetting<T>("access");
+export const writeAccessSetting = (value: unknown) => backend.writeSetting("access", value);
+
 // ---------- categories and tags ----------
 
 /** All categories (the owner's list, or the defaults) and every tag in use or added by hand. */
 export async function getTaxonomy(): Promise<Taxonomy> {
-  const file = await backend.readTaxonomy();
+  const file = await backend.readSetting<Partial<Taxonomy>>("taxonomy");
   const recipes = await listRecipes();
   const categories: Category[] = file?.categories ?? DEFAULT_CATEGORIES.map((c) => ({ ...c }));
   // Categories typed by hand before the management page existed show up as their own entries.
@@ -142,7 +148,7 @@ export async function changeTaxonomy(change: TaxonomyChange): Promise<Taxonomy> 
     }
   }
 
-  await backend.writeTaxonomy(tax);
+  await backend.writeSetting("taxonomy", tax);
   for (const r of changed) await backend.saveRecipe(r);
   return tax;
 }

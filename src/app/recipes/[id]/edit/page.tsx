@@ -1,13 +1,18 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import BackButton from "@/components/BackButton";
 import RecipeForm from "@/components/RecipeForm";
 import SiteHeader from "@/components/SiteHeader";
 import { btnPrimary } from "@/components/ui";
-import { requireAuth } from "@/lib/auth";
+import { getRole } from "@/lib/auth";
+import PasswordGate from "@/components/PasswordGate";
 import { getRecipe, getTaxonomy } from "@/lib/store";
 
 export default async function EditRecipePage({ params }: PageProps<"/recipes/[id]/edit">) {
-  await requireAuth();
+  const role = await getRole();
+  if (role !== "owner") {
+    if (role === "guest") redirect("/");
+    return <PasswordGate />;
+  }
   const { id } = await params;
   const recipe = await getRecipe(id);
   if (!recipe) notFound();

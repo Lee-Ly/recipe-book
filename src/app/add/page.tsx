@@ -1,5 +1,7 @@
 import AddRecipe from "@/components/AddRecipe";
-import { requireAuth } from "@/lib/auth";
+import { getRole } from "@/lib/auth";
+import { redirect } from "next/navigation";
+import PasswordGate from "@/components/PasswordGate";
 import { getTaxonomy } from "@/lib/store";
 
 function first(v: string | string[] | undefined): string {
@@ -13,9 +15,11 @@ export default async function AddPage({ searchParams }: PageProps<"/add">) {
   const sharedUrl = /https?:\/\/[^\s]+/.exec(shared)?.[0] ?? "";
   const sharedText = sharedUrl ? "" : first(sp.text);
 
-  const back = new URLSearchParams();
-  for (const k of ["url", "text", "title"]) if (first(sp[k])) back.set(k, first(sp[k]));
-  await requireAuth(back.size > 0 ? `/add?${back}` : "/add");
+  const role = await getRole();
+  if (role !== "owner") {
+    if (role === "guest") redirect("/");
+    return <PasswordGate />;
+  }
 
   const taxonomy = await getTaxonomy();
   return <AddRecipe initialUrl={sharedUrl} initialText={sharedText} categories={taxonomy.categories} tagPool={taxonomy.tags} />;

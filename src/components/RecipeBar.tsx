@@ -10,7 +10,7 @@ import SiteHeader from "./SiteHeader";
 import { btnIcon } from "./ui";
 
 /** Header of the recipe page: back on the left; edit, favorite and screen-awake on the right. */
-export default function RecipeBar({ id, favorite: initialFavorite }: { id: string; favorite: boolean }) {
+export default function RecipeBar({ id, favorite: initialFavorite, readOnly = false }: { id: string; favorite: boolean; readOnly?: boolean }) {
   const router = useRouter();
   const [favorite, setFavorite] = useState(initialFavorite);
   const awake = useAwake();
@@ -33,12 +33,14 @@ export default function RecipeBar({ id, favorite: initialFavorite }: { id: strin
       left={<BackButton />}
       right={
         <>
-          <Link href={`/recipes/${id}/edit`} aria-label="Edit recipe" className={btnIcon}>
-            <PencilIcon />
-          </Link>
-          <button type="button" onClick={toggleFavorite} aria-pressed={favorite} aria-label={favorite ? "Remove from favorites" : "Add to favorites"} className={btnIcon}>
+          {!readOnly && (
+            <Link href={`/recipes/${id}/edit`} aria-label="Edit recipe" className={btnIcon}>
+              <PencilIcon />
+            </Link>
+          )}
+          {!readOnly && <button type="button" onClick={toggleFavorite} aria-pressed={favorite} aria-label={favorite ? "Remove from favorites" : "Add to favorites"} className={btnIcon}>
             <HeartIcon filled={favorite} className={`h-4 w-4 transition ${favorite ? "text-accent" : "text-muted"}`} />
-          </button>
+          </button>}
           <button
             type="button"
             onClick={() => setAwake(!awake)}

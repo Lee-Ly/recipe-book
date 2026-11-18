@@ -1,10 +1,8 @@
 import { createClient } from "@supabase/supabase-js";
-import type { Taxonomy } from "./categories";
 import type { Backend } from "./store-backend";
 import type { Recipe } from "./types";
 
 const BUCKET = "recipe-images";
-const SETTINGS_KEY = "taxonomy";
 
 /** Recipes and settings in Supabase tables, photos in a private Storage bucket. Only used on the server, with the secret key. */
 export function createSupabaseBackend(url: string, secretKey: string): Backend {
@@ -38,14 +36,14 @@ export function createSupabaseBackend(url: string, secretKey: string): Backend {
       const { error } = await db.from("recipes").delete().eq("id", id);
       check("deleting a recipe", error);
     },
-    async readTaxonomy() {
-      const { data, error } = await db.from("site_settings").select("data").eq("key", SETTINGS_KEY).maybeSingle();
-      check("reading categories and tags", error);
-      return data ? (data.data as Partial<Taxonomy>) : null;
+    async readSetting<T>(key: string) {
+      const { data, error } = await db.from("site_settings").select("data").eq("key", key).maybeSingle();
+      check(`reading setting ${key}`, error);
+      return data ? (data.data as T) : null;
     },
-    async writeTaxonomy(taxonomy: Taxonomy) {
-      const { error } = await db.from("site_settings").upsert({ key: SETTINGS_KEY, data: taxonomy });
-      check("saving categories and tags", error);
+    async writeSetting(key, value) {
+      const { error } = await db.from("site_settings").upsert({ key, data: value });
+      check(`saving setting ${key}`, error);
     },
     async putImage(name, data, contentType) {
       const { error } = await db.storage.from(BUCKET).upload(name, data, { contentType, upsert: true });
